@@ -1,0 +1,101 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    padding: 10px;
+}
+
+.wellFrame {
+    position: relative;
+    width: 120px;
+    height: 240px;
+    border-radius: 4px;
+    overflow: visible;
+}
+
+.groundLine {
+    position: absolute;
+    top: 0;
+    left: -20px;
+    right: -20px;
+    height: 4px;
+    background: #4b5563;
+    border-radius: 2px;
+}
+
+.shaft {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.05);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column-reverse; /* Fill from bottom */
+}
+
+.water {
+    width: 100%;
+    background: linear-gradient(to top, rgba(59, 130, 246, 0.6), rgba(6, 182, 212, 0.4));
+    position: relative;
+    transition: height 1s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+}
+
+.ripples {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    filter: blur(1px);
+}
+
+.levelLabel {
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #67e8f9;
+    white-space: nowrap;
+    text-shadow: 0 0 10px rgba(6, 182, 212, 0.8);
+}
+
+.markers {
+    position: absolute;
+    top: 0;
+    right: -35px;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: #94a3b8;
+    padding: 5px 0;
+}
+
+.legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.legendItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.groundDot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; }
+.waterDot { width: 8px; height: 8px; border-radius: 50%; background: #06b6d4; }

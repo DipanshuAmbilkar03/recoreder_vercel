@@ -1,0 +1,332 @@
+.container {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 30px;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background: linear-gradient(160deg, rgba(8, 8, 8, 0.95), rgba(18, 18, 18, 0.82));
+    border: 1px solid rgba(115, 115, 115, 0.25);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    height: 100%;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+
+.container::before,
+.container::after {
+    content: none;
+    position: absolute;
+    width: 150%;
+    height: 240px;
+    left: -25%;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.container::before {
+    top: -80px;
+    background: radial-gradient(ellipse at center, rgba(224, 242, 254, 0.22) 0%, rgba(79, 195, 247, 0.1) 48%, transparent 70%);
+    filter: blur(16px);
+}
+
+.container::after {
+    bottom: -150px;
+    background: radial-gradient(ellipse at center, rgba(11, 38, 92, 0.42) 0%, rgba(2, 12, 27, 0.8) 62%, transparent 78%);
+    filter: blur(20px);
+}
+
+.visualColumn,
+.infoColumn {
+    position: relative;
+    z-index: 1;
+}
+
+@media (max-width: 900px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── LEFT SIDE: VISUAL COLUMN ── */
+.visualColumn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 10px;
+    border-right: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 900px) {
+    .visualColumn {
+        border-right: none;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        padding-bottom: 30px;
+    }
+}
+
+.wellLabelTop {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.surfaceLine {
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #7dd3fc, #2563eb);
+    border-radius: 2px;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.45);
+    position: relative;
+    z-index: 2;
+}
+
+.wellEnvironment {
+    width: 100%;
+    height: 300px;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(to bottom, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.9));
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    padding-top: 0;
+    position: relative;
+}
+
+.wellEnvironment::before,
+.wellEnvironment::after {
+    content: none;
+    position: absolute;
+    left: -8%;
+    width: 116%;
+    border-radius: 55% 45% 60% 40%;
+    filter: blur(12px);
+    pointer-events: none;
+}
+
+.wellEnvironment::before {
+    top: 8%;
+    height: 70px;
+    background: linear-gradient(90deg, rgba(186, 230, 253, 0.3), rgba(79, 195, 247, 0.16), rgba(21, 101, 192, 0.22));
+    opacity: 0.8;
+}
+
+.wellEnvironment::after {
+    top: 26%;
+    height: 90px;
+    background: linear-gradient(90deg, rgba(79, 195, 247, 0.08), rgba(25, 118, 210, 0.2), rgba(13, 27, 42, 0.28));
+    opacity: 0.75;
+}
+
+.wellShaft {
+    width: 80px;
+    height: 100%;
+    background: linear-gradient(to bottom, #7ec8c9 0%, #3fa7a3 38%, #0f5c5c 70%, #022f34 100%);
+    border-left: 2px solid #3fa7a3;
+    border-right: 2px solid #3fa7a3;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+/* Water Fill & Animation */
+.waterFill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    /* The height is controlled via inline react styles, but the transition ensures it glides */
+    transition: height 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.4);
+}
+
+.waterSurface {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.4);
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 50% 50% 0 0;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+}
+
+/* Status Colors for Water */
+.statusSafe {
+    background: linear-gradient(to bottom, #3b82f6, #06b6d4);
+}
+.statusModerate {
+    background: linear-gradient(to bottom, #f59e0b, #d97706);
+}
+.statusCritical {
+    background: linear-gradient(to bottom, #ef4444, #b91c1c);
+}
+
+/* Depth Markers */
+.depthMarker {
+    position: absolute;
+    right: -45px;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    transform: translateY(50%);
+    opacity: 0.6;
+}
+
+.currentLevelIndicator {
+    position: absolute;
+    left: -10px;
+    width: calc(100% + 20px);
+    height: 2px;
+    background: #fff;
+    box-shadow: 0 0 10px #fff;
+    transition: bottom 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+}
+
+.currentLevelTag {
+    position: absolute;
+    left: -55px;
+    top: -10px;
+    background: #fff;
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+
+/* ── RIGHT SIDE: INFO COLUMN ── */
+.infoColumn {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.gridItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+}
+
+.iconWrapper {
+    color: #cbd5e1;
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.7));
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+}
+
+.iconSvg {
+    width: 20px;
+    height: 20px;
+}
+
+.itemContent {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.itemContent label {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.itemContent strong {
+    font-size: 0.95rem;
+    color: #e2e8f0;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+/* Highlights */
+.highlightSection {
+    display: flex;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-top: 10px;
+}
+
+.highlightItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.highlightItem label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.mainValue {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    font-family: var(--font-heading);
+}
+
+.trendSubtitle {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+}
+
+.statusBadge {
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.statusBadge.statusSafe {
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.22), rgba(22, 163, 74, 0.12));
+    color: #86efac;
+    border: 1px solid rgba(74, 222, 128, 0.55);
+    box-shadow: inset 0 1px 0 rgba(187, 247, 208, 0.18), 0 0 14px rgba(22, 163, 74, 0.22);
+}
+
+.statusBadge.statusModerate {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.statusBadge.statusCritical {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}

@@ -1,0 +1,55 @@
+.chartContainer {
+    position: relative;
+    height: 380px;
+    width: 100%;
+    padding: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(115, 115, 115, 0.22);
+    background: linear-gradient(145deg, rgba(8, 8, 8, 0.88), rgba(16, 16, 16, 0.74));
+}
+
+.chartContainerMini {
+    position: relative;
+    height: 180px;
+    width: 100%;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(115, 115, 115, 0.2);
+    background: linear-gradient(145deg, rgba(8, 8, 8, 0.88), rgba(16, 16, 16, 0.74));
+}
+
+.chartContainerLarge {
+    position: relative;
+    height: 460px;
+    width: 100%;
+    padding: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(115, 115, 115, 0.22);
+    background: linear-gradient(145deg, rgba(8, 8, 8, 0.88), rgba(16, 16, 16, 0.74));
+}
+
+.emptyChart {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 260px;
+    color: #9ca3af;
+    font-size: 0.82rem;
+    border: 1px dashed rgba(115, 115, 115, 0.38);
+    border-radius: var(--radius-md);
+    background: rgba(20, 20, 20, 0.64);
+}
+
+@media (max-width: 768px) {
+    .chartContainer {
+        height: 260px;
+    }
+
+    .chartContainerMini {
+        height: 170px;
+    }
+
+    .chartContainerLarge {
+        height: 300px;
+    }
+}
