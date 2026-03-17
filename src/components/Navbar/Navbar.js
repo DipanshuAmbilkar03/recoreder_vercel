@@ -56,9 +56,6 @@ export default function Navbar() {
 
                 <div className={styles.desktopOnly}>
                     <div className={styles.actionRow}>
-                        <Link href="/sync" className={`${styles.loginBtn} ${styles.syncBtn}`}>
-                            Fetch Live Data
-                        </Link>
                         <Link href="/login" className={styles.loginBtn}>
                             Login
                         </Link>
