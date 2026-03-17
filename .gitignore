@@ -78,6 +78,9 @@ next-env.d.ts
 pprxt/
 docs/implementation_plan.md.resolved
 dwlr-frontend/src/demo assets/
-public/
+
 docs_/
 src/demo assets/
+
+# video exports (too large for normal git)
+/public/video/*.mp4
