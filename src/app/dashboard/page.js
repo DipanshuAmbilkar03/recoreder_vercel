@@ -211,7 +211,7 @@ export default function DashboardPage() {
                     {/* AI Forecasting Panel */}
                     <section className={`${styles.panel} ${styles.trendPanel}`}>
                         <div className={styles.panelHeader}>
-                            <h2 className={styles.panelTitle}>🤖 AI Predictive Forecast</h2>
+                            <h2 className={styles.panelTitle}>AI Predictive Forecast</h2>
                             <div className={styles.panelControls}>
                                 <select 
                                     className={styles.select}
