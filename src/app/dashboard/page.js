@@ -15,6 +15,7 @@ const InfrastructureStatusLineChart = dynamic(() => import("@/components/Charts/
 const DepthBandLineChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.DepthBandLineChart), { ssr: false });
 const SeasonalMomentumLineChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.SeasonalMomentumLineChart), { ssr: false });
 const StationInsightPanel = dynamic(() => import("@/components/Charts/StationInsightPanel").then(m => m.StationInsightPanel), { ssr: false });
+const ForecastChart = dynamic(() => import("@/components/Charts/ForecastChart"), { ssr: false });
 
 export default function DashboardPage() {
     const [stats, setStats] = useState(null);
@@ -31,6 +32,12 @@ export default function DashboardPage() {
     const [seasonalData, setSeasonalData] = useState([]);
     const [districtInsights, setDistrictInsights] = useState([]);
     const [districtComparison, setDistrictComparison] = useState([]);
+
+    // Forecasting State
+    const [forecastData, setForecastData] = useState([]);
+    const [forecastDays, setForecastDays] = useState(30);
+    const [forecastLoading, setForecastLoading] = useState(false);
+    const [forecastMetadata, setForecastMetadata] = useState(null);
 
     const [loading, setLoading] = useState(true);
 
@@ -93,6 +100,25 @@ export default function DashboardPage() {
         };
         fetchTrends();
     }, [selectedStation?.station_id, trendPeriod]); // Use station_id specifically
+
+    useEffect(() => {
+        if (!selectedStation) return;
+        const fetchForecast = async () => {
+            try {
+                setForecastLoading(true);
+                const res = await axios.get(`${API_URL}/forecast/${selectedStation.station_id}?days=${forecastDays}`);
+                setForecastData(res.data.forecast || []);
+                setForecastMetadata(res.data.metadata || null);
+            } catch (err) {
+                console.error("Forecast Fetch Error:", err);
+                setForecastData([]);
+                setForecastMetadata(null);
+            } finally {
+                setForecastLoading(false);
+            }
+        };
+        fetchForecast();
+    }, [selectedStation?.station_id, forecastDays]);
 
     const metrics = [
         { label: "Total Stations", value: stats?.total_stations || "—", icon: null, color: "#3b82f6" },
@@ -180,6 +206,51 @@ export default function DashboardPage() {
                         <div className={styles.chartBox}>
                             <WaterLevelTrendChart trendData={trendData} stationName={selectedStation?.station_name} />
                         </div>
+                    </section>
+
+                    {/* AI Forecasting Panel */}
+                    <section className={`${styles.panel} ${styles.trendPanel}`}>
+                        <div className={styles.panelHeader}>
+                            <h2 className={styles.panelTitle}>🤖 AI Predictive Forecast</h2>
+                            <div className={styles.panelControls}>
+                                <select 
+                                    className={styles.select}
+                                    value={forecastDays}
+                                    onChange={(e) => setForecastDays(parseInt(e.target.value))}
+                                    disabled={forecastLoading}
+                                >
+                                    <option value={30}>30 Days Horizon</option>
+                                    <option value={60}>60 Days Horizon</option>
+                                    <option value={90}>90 Days Horizon</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className={styles.chartBox}>
+                            {forecastLoading ? (
+                                <div className={styles.loadingShimmer}>
+                                    <div className={styles.spinner}></div>
+                                    <p>Running time-series inference via Prophet ML model...</p>
+                                </div>
+                            ) : (
+                                <ForecastChart 
+                                    historicalData={trendData} 
+                                    forecastData={forecastData} 
+                                    stationName={selectedStation?.station_name} 
+                                />
+                            )}
+                        </div>
+                        {forecastMetadata && (
+                            <div className={styles.forecastMeta}>
+                                <span className={styles.metaItem}>Model Engine: <strong>{forecastMetadata.model_type}</strong></span>
+                                {forecastMetadata.mae > 0 && (
+                                    <span className={styles.metaItem}>Model Precision (MAE): <strong>{forecastMetadata.mae}m</strong></span>
+                                )}
+                                <span className={styles.metaItem}>Datasets Analyzed: <strong>{forecastMetadata.data_points_used} points</strong></span>
+                                {forecastMetadata.warning && (
+                                    <span className={styles.warningText}>⚠️ {forecastMetadata.warning}</span>
+                                )}
+                            </div>
+                        )}
                     </section>
                 </div>
 
