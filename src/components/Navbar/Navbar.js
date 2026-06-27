@@ -2,25 +2,50 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./Navbar.module.css";
 
-const navLinks = [
+const baseLinks = [
     { href: "/", label: "Home", icon: "" },
     { href: "/dashboard", label: "Dashboard", icon: "" },
-    { href: "/map", label: "Map" ,icon:""},
+    { href: "/map", label: "Map", icon: "" },
     { href: "/stations", label: "Stations", icon: "" },
 ];
 
 export default function Navbar() {
     const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
+    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+
+    useEffect(() => {
+        // Read auth token from localStorage on mount
+        const checkAuth = () => {
+            const token = localStorage.getItem("admin_token");
+            setIsAdminLoggedIn(!!token);
+        };
+
+        checkAuth();
+
+        // Listen for login/logout events from other components
+        window.addEventListener("admin-login", checkAuth);
+        window.addEventListener("admin-logout", checkAuth);
+
+        return () => {
+            window.removeEventListener("admin-login", checkAuth);
+            window.removeEventListener("admin-logout", checkAuth);
+        };
+    }, []);
+
+    // Create current list of links
+    const navLinks = [...baseLinks];
+    if (isAdminLoggedIn) {
+        navLinks.push({ href: "/sync", label: "Sync Data", icon: "🔄" });
+    }
 
     return (
         <nav className={styles.nav}>
             <div className={`container ${styles.navInner}`}>
                 <Link href="/" className={styles.logo}>
-                    {/* <span className={styles.logoIcon}></span> */}
                     <span className={styles.logoText}>DWLR Monitor</span>
                 </Link>
 
@@ -38,8 +63,9 @@ export default function Navbar() {
                         <li key={link.href}>
                             <Link
                                 href={link.href}
-                                className={`${styles.link} ${pathname === link.href ? styles.active : ""
-                                    }`}
+                                className={`${styles.link} ${pathname === link.href ? styles.active : ""} ${
+                                    link.href === "/sync" ? styles.syncBtn : ""
+                                }`}
                                 onClick={() => setIsOpen(false)}
                             >
                                 <span className={styles.linkIcon}>{link.icon}</span>
@@ -48,16 +74,16 @@ export default function Navbar() {
                         </li>
                     ))}
                     <li className={styles.mobileOnly}>
-                         <Link href="/login" className={styles.loginBtn}>
-                            Login
+                        <Link href="/admin" className={styles.loginBtn} onClick={() => setIsOpen(false)}>
+                            {isAdminLoggedIn ? "Admin" : "Login"}
                         </Link>
                     </li>
                 </ul>
 
                 <div className={styles.desktopOnly}>
                     <div className={styles.actionRow}>
-                        <Link href="/login" className={styles.loginBtn}>
-                            Login
+                        <Link href="/admin" className={styles.loginBtn}>
+                            {isAdminLoggedIn ? "Admin" : "Login"}
                         </Link>
                     </div>
                 </div>

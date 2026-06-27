@@ -4,14 +4,16 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import styles from "./page.module.css";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function SyncPage() {
     const router = useRouter();
     const [isAdmin, setIsAdmin] = useState(false);
+    const [checkingAuth, setCheckingAuth] = useState(true);
 
     // States and Districts Data
     const [stations, setStations] = useState([]);
-    const [loadingStations, setLoadingStations] = useState(true);
+    const [loadingStations, setLoadingStations] = useState(false);
 
     // Sync State and Form
     const [syncState, setSyncState] = useState("idle");
@@ -31,7 +33,41 @@ export default function SyncPage() {
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+    // ── Secure Session Check ──
     useEffect(() => {
+        const checkAuth = async () => {
+            const token = localStorage.getItem("admin_token");
+            if (!token) {
+                setIsAdmin(false);
+                setCheckingAuth(false);
+                return;
+            }
+
+            try {
+                const res = await axios.get(`${API_URL}/auth/me`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.data?.user && res.data.user.role === "admin") {
+                    setIsAdmin(true);
+                } else {
+                    setIsAdmin(false);
+                    localStorage.removeItem("admin_token");
+                }
+            } catch (err) {
+                console.error("Auth check failed:", err);
+                setIsAdmin(false);
+                localStorage.removeItem("admin_token");
+            } finally {
+                setCheckingAuth(false);
+            }
+        };
+        checkAuth();
+    }, [API_URL]);
+
+    // ── Load Stations for Dropdowns ──
+    useEffect(() => {
+        if (!isAdmin) return;
+
         const fetchStations = async () => {
             try {
                 setLoadingStations(true);
@@ -44,7 +80,7 @@ export default function SyncPage() {
             }
         };
         fetchStations();
-    }, [API_URL]);
+    }, [isAdmin, API_URL]);
 
     const availableStates = Array.from(new Set(stations.map(s => s.state))).filter(Boolean).sort();
     const availableDistricts = syncParams.stateName
@@ -58,6 +94,14 @@ export default function SyncPage() {
             return;
         }
 
+        const token = localStorage.getItem("admin_token");
+        if (!token) {
+            setSyncState("error");
+            setSyncMessage("Session expired. Please log in again.");
+            setIsAdmin(false);
+            return;
+        }
+
         try {
             setSyncState("syncing");
             setSyncMessage("");
@@ -67,10 +111,12 @@ export default function SyncPage() {
                 districtName: syncParams.districtName,
                 startdate: syncParams.startdate,
                 enddate: syncParams.enddate,
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
             setSyncState("success");
-            setSyncMessage(`Success: ${res.data.stationsUpserted} stations updated, ${res.data.readingsInserted} readings added.`);
+            setSyncMessage(`Success: ${res.data.stationsUpserted || 0} stations updated, ${res.data.readingsInserted || 0} readings added.`);
 
             // Redirect to map after 2 seconds
             setTimeout(() => {
@@ -80,33 +126,33 @@ export default function SyncPage() {
         } catch (err) {
             console.error("Sync failed:", err);
             setSyncState("error");
-            setSyncMessage(err.response?.data?.message || "Failed to fetch data from WRIS.");
+            setSyncMessage(err.response?.data?.error || err.response?.data?.message || "Failed to fetch data from WRIS.");
         }
     };
+
+    if (checkingAuth) {
+        return (
+            <main className="container" style={{ marginTop: "120px", display: "flex", justifyContent: "center" }}>
+                <div className={styles.spinnerSmall} style={{ width: "40px", height: "40px" }}></div>
+            </main>
+        );
+    }
 
     return (
         <main className="container" style={{ marginTop: "120px", display: "flex", justifyContent: "center" }}>
             <div className={styles.syncCard}>
                 <div className={styles.header}>
                     <h2>Administration: Fetch Live Data</h2>
-                    <div className={styles.adminToggle}>
-                        <span>Admin Mode</span>
-                        <label className={styles.switch}>
-                            <input
-                                type="checkbox"
-                                checked={isAdmin}
-                                onChange={(e) => setIsAdmin(e.target.checked)}
-                            />
-                            <span className={styles.slider}></span>
-                        </label>
-                    </div>
                 </div>
 
                 {!isAdmin ? (
                     <div className={styles.restrictedView}>
                         <div className={styles.lockIcon}>🔒</div>
                         <h3>Access Restricted</h3>
-                        <p>Only administrators can fetch direct live data from the India WRIS API to insert into the centralized database.</p>
+                        <p style={{ marginBottom: "20px" }}>Only authenticated administrators can sync live data from the India WRIS API.</p>
+                        <Link href="/admin" className="btn-primary" style={{ padding: "10px 20px", textDecoration: "none", borderRadius: "8px", fontWeight: "bold" }}>
+                            Go to Login
+                        </Link>
                     </div>
                 ) : (
                     <div className={styles.formContainer}>
