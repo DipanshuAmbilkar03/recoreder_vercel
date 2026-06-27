@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import L from "leaflet";
+import Link from "next/link";
 import styles from "./MapComponent.module.css";
 
 const METER_RADIUS = 17;
@@ -200,7 +201,7 @@ export default function MapComponent({ stations = [], selectedStation, onStation
                                                 {station.station_status || "Active"}
                                             </span>
                                             <div className={styles.popupAction}>
-                                                <a href={`/stations/${station.station_id}`}>View Details</a>
+                                                <Link href={`/dashboard?station_id=${station.station_id}`}>View Details</Link>
                                             </div>
                                         </div>
                                     </Popup>

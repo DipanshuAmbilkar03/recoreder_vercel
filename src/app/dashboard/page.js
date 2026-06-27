@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import dynamic from "next/dynamic";
 import styles from "./page.module.css";
@@ -17,7 +18,10 @@ const SeasonalMomentumLineChart = dynamic(() => import("@/components/Charts/Char
 const StationInsightPanel = dynamic(() => import("@/components/Charts/StationInsightPanel").then(m => m.StationInsightPanel), { ssr: false });
 const ForecastChart = dynamic(() => import("@/components/Charts/ForecastChart"), { ssr: false });
 
-export default function DashboardPage() {
+function DashboardPageContent() {
+    const searchParams = useSearchParams();
+    const stationIdParam = searchParams.get("station_id");
+
     const [stats, setStats] = useState(null);
     const [stations, setStations] = useState([]);
     const [selectedStation, setSelectedStation] = useState(null);
@@ -68,8 +72,19 @@ export default function DashboardPage() {
                 setStats(overview.data);
                 const st = stationList.data.data || [];
                 setStations(st);
-                const initialStation = st.find(s => s.state === "Maharashtra") || st[0];
-                if (initialStation) setSelectedStation(initialStation);
+                
+                let targetStation = null;
+                if (stationIdParam) {
+                    const id = parseInt(stationIdParam, 10);
+                    targetStation = st.find(s => s.station_id === id);
+                }
+                const initialStation = targetStation || st.find(s => s.state === "Maharashtra") || st[0];
+                if (initialStation) {
+                    setSelectedStation(initialStation);
+                    if (initialStation.state) {
+                        setSelectedState(initialStation.state);
+                    }
+                }
                 
                 setAquiferData(aquifers.data);
                 setStatusData(status.data);
@@ -84,7 +99,20 @@ export default function DashboardPage() {
             }
         };
         fetchData();
-    }, []);
+    }, [stationIdParam]);
+
+    useEffect(() => {
+        if (stationIdParam && stations.length > 0) {
+            const id = parseInt(stationIdParam, 10);
+            const target = stations.find(s => s.station_id === id);
+            if (target) {
+                setSelectedStation(target);
+                if (target.state) {
+                    setSelectedState(target.state);
+                }
+            }
+        }
+    }, [stationIdParam, stations]);
 
     useEffect(() => {
         if (!selectedStation) return;
@@ -320,5 +348,17 @@ export default function DashboardPage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <Suspense fallback={
+            <main className="container" style={{ marginTop: "120px", display: "flex", justifyContent: "center" }}>
+                <div style={{ color: "rgba(255, 255, 255, 0.6)" }}>Loading Dashboard Insights...</div>
+            </main>
+        }>
+            <DashboardPageContent />
+        </Suspense>
     );
 }
