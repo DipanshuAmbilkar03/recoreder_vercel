@@ -1,7 +1,7 @@
 .container {
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     min-height: calc(100vh - 120px);
     margin-top: 120px;
     padding: 20px;
@@ -20,6 +20,7 @@
     display: flex;
     flex-direction: column;
     gap: 24px;
+    margin: 40px auto;
 }
 
 .header {
@@ -51,16 +52,18 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    margin-bottom: 5px;
 }
 
 .inputGroup label {
     font-size: 0.85rem;
     color: rgba(255, 255, 255, 0.8);
     font-weight: 500;
+    text-align: left;
 }
 
 .input {
-    background: rgba(255, 255, 255, 0.05);
+    background: #0f172a;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 12px 16px;
@@ -129,6 +132,7 @@
     border-radius: 8px;
     font-size: 0.9rem;
     line-height: 1.4;
+    text-align: left;
 }
 
 /* Loader style */
@@ -137,8 +141,9 @@
     height: 18px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
-    border-top-color: white;
-    animation: spin 1s ease-in-out infinite;
+    border-top-color: #3b82f6;
+    animation: spin 1s linear infinite;
+    display: inline-block;
 }
 
 @keyframes spin {
@@ -148,10 +153,11 @@
 /* Logged-in admin layout styles */
 .adminWrapper {
     width: 100%;
-    max-width: 1000px;
+    max-width: 1200px;
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 24px;
+    margin-bottom: 60px;
 }
 
 .adminHeader {
@@ -163,18 +169,47 @@
     padding: 20px 30px;
     border-radius: 12px;
     backdrop-filter: blur(12px);
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.adminHeaderLeft {
+    text-align: left;
 }
 
 .adminHeaderLeft h2 {
     font-size: 1.6rem;
     margin: 0 0 5px 0;
     color: #ffffff;
+    font-weight: 700;
 }
 
 .adminHeaderLeft p {
     margin: 0;
     color: rgba(255, 255, 255, 0.6);
     font-size: 0.9rem;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dashboardLink {
+    text-decoration: none;
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.dashboardLink:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
 }
 
 .logoutBtn {
@@ -194,15 +229,49 @@
     border-color: #ef4444;
 }
 
+/* Tabs Navigation */
+.tabsNav {
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 2px;
+    overflow-x: auto;
+}
+
+.tabBtn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+}
+
+.tabBtn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px 8px 0 0;
+}
+
+.activeTab {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+/* Grid Layouts */
 .adminGrid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 30px;
+    gap: 24px;
 }
 
 @media (min-width: 768px) {
     .adminGrid {
-        grid-template-columns: 3fr 2fr;
+        grid-template-columns: 1fr 1fr;
     }
 }
 
@@ -210,8 +279,20 @@
     background: rgba(15, 23, 42, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 30px;
+    padding: 24px;
     backdrop-filter: blur(12px);
+    text-align: left;
+}
+
+.adminCardFull {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 24px;
+    backdrop-filter: blur(12px);
+    text-align: left;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .cardHeader {
@@ -224,6 +305,7 @@
     font-size: 1.25rem;
     margin: 0 0 5px 0;
     color: #ffffff;
+    font-weight: 600;
 }
 
 .cardHeader p {
@@ -232,6 +314,501 @@
     font-size: 0.85rem;
 }
 
+/* Toolbar & Filters */
+.tableToolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.toolbarLeft h3 {
+    font-size: 1.25rem;
+    margin: 0 0 5px 0;
+    color: #ffffff;
+}
+
+.toolbarLeft p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
+}
+
+.addBtn {
+    background: #10b981;
+    color: #f8fafc;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.addBtn:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.filterRow {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.searchInput {
+    flex: 1;
+    min-width: 200px;
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+    border-color: #3b82f6;
+}
+
+.filterSelect {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    outline: none;
+    cursor: pointer;
+    min-width: 150px;
+}
+
+.filterSelect option {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+.counterLabel {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Data Tables */
+.tableWrapper {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.adminTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-align: left;
+}
+
+.adminTable th {
+    background: #0f172a;
+    padding: 14px 16px;
+    font-weight: 600;
+    color: #ffffff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.adminTable td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+}
+
+.adminTable tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.codeCell {
+    font-family: monospace;
+    color: #f43f5e;
+    font-weight: 600;
+}
+
+.nameCell {
+    font-weight: 500;
+    color: #f8fafc;
+}
+
+.coordCell {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.statusToggle {
+    border: none;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.statusActive {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+
+.statusActive:hover {
+    background: rgba(16, 185, 129, 0.25);
+}
+
+.statusInactive {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.statusInactive:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
+.actionsCell {
+    display: flex;
+    gap: 8px;
+}
+
+.editBtn {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.editBtn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6;
+}
+
+.deleteBtn {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.deleteBtn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+}
+
+/* Pagination Row */
+.paginationRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.pageBtn {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.pageBtn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.pageBtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pageInfo {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Loader Box */
+.loadingSpinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px 0;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.emptyBox {
+    padding: 30px;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.95rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Sync guides */
+.syncNoticeBox {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 20px;
+}
+
+/* Parameter Configurations inputs help text */
+.inputHelp {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.45);
+    line-height: 1.4;
+    margin-top: 3px;
+    text-align: left;
+}
+
+/* Alerts System */
+.alertList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 350px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.alertItem {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.alertItem:hover {
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.02);
+}
+
+.alertDetails {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.alertTag {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    align-self: flex-start;
+}
+
+.alertMessage {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #f8fafc;
+    font-weight: 500;
+}
+
+.alertTime {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.resolveBtn {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #34d399;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.resolveBtn:hover {
+    background: #10b981;
+    color: #f8fafc;
+}
+
+/* Modals System styling */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.modalContent {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 550px;
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    animation: scaleUp 0.25s ease-out;
+}
+
+@keyframes scaleUp {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modalHeader h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #f8fafc;
+}
+
+.closeBtn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1.6rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.closeBtn:hover {
+    color: #f8fafc;
+}
+
+.modalForm {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modalInput {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #f8fafc;
+    font-size: 0.95rem;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.modalInput:focus {
+    border-color: #3b82f6;
+}
+
+.modalInput option {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+.modalGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.cancelBtn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.cancelBtn:hover {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+.saveSubmitBtn {
+    background: #3b82f6;
+    color: #f8fafc;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.saveSubmitBtn:hover {
+    background: #2563eb;
+}
+
+.saveSubmitBtn:disabled {
+    background: rgba(59, 130, 246, 0.4);
+    cursor: not-allowed;
+}
+
+/* Extra Form/Sync Layout classes from original page */
 .formContainer {
     display: flex;
     flex-direction: column;
@@ -245,7 +822,7 @@
 }
 
 .formSelect {
-    background: rgba(255, 255, 255, 0.05);
+    background: #0f172a;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 12px;
@@ -261,7 +838,7 @@
 
 .formSelect option {
     background: #0f172a;
-    color: white;
+    color: #f8fafc;
 }
 
 .statusBox {
@@ -273,7 +850,7 @@
 }
 
 .successBox {
-    background: rgba(16, 185, 129, 0.1);
+    background: rgba(16, 185, 129, 0.15);
     color: #34d399;
     border: 1px solid rgba(16, 185, 129, 0.2);
 }
@@ -304,3 +881,236 @@
     color: #ffffff;
     font-weight: 500;
 }
+
+
+.input {
+    background-color: #0f172a;
+    color: #e2e8f0;
+    color-scheme: dark;
+}
+
+.input option {
+    background-color: #0f172a;
+    color: #f8fafc;
+}
+
+
+.searchInput {
+    background-color: #0f172a;
+    color: #e2e8f0;
+    color-scheme: dark;
+}
+
+.searchInput option {
+    background-color: #0f172a;
+    color: #f8fafc;
+}
+
+
+/* ===== Landing-aligned visual skin (auto) ===== */
+.main {
+    background:
+        radial-gradient(900px 420px at 8% -8%, rgba(14, 116, 144, 0.16), transparent 58%),
+        radial-gradient(700px 360px at 92% 0%, rgba(8, 47, 73, 0.18), transparent 55%),
+        linear-gradient(180deg, #020617 0%, #01040d 48%, #020617 100%) !important;
+    color: #cbd5e1 !important;
+    font-family: var(--font-primary) !important;
+}
+
+.header,
+.pageHead,
+.filterBar,
+.toolbar,
+.panel,
+.chartCard,
+.insightTile,
+.miniPanel,
+.tableWrapper,
+.riskSummaryBar,
+.sideHead,
+.card {
+    border-color: rgba(186, 230, 253, 0.16) !important;
+    background: linear-gradient(160deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.7)) !important;
+    box-shadow: 0 16px 40px rgba(2, 6, 23, 0.35) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.kicker,
+.stepLabel {
+    color: #67e8f9 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    font-weight: 800 !important;
+}
+
+.subtitle,
+.pageSub,
+.sectionNote,
+.muted,
+.emptyMsg,
+.metricLabel,
+.metricHint,
+.leaderMeta,
+.listMeta,
+.code,
+.helpList {
+    color: #94a3b8 !important;
+}
+
+.title,
+.pageTitle,
+.panelTitle,
+.sectionTitle,
+.sectionHeading {
+    color: #f8fafc !important;
+    letter-spacing: -0.02em !important;
+}
+
+.metricCard,
+.leaderItem,
+.stationSummary {
+    border: 1px solid rgba(148, 163, 184, 0.14) !important;
+    background: rgba(2, 6, 23, 0.45) !important;
+}
+
+.metricValue,
+.leaderValue,
+.leaderName {
+    color: #f8fafc !important;
+}
+
+.livePill,
+.metaChip,
+.endpointBadge,
+.deltaChip,
+.exportBtn,
+.refreshBtn,
+.quickLink,
+.viewLink,
+.mapLink,
+.headLink,
+.linkBtn,
+.cmdLink,
+.dirLink,
+.detailsLink,
+.mapRetryBtn,
+.pageBtn,
+.favBtn {
+    border-color: rgba(56, 189, 248, 0.35) !important;
+    color: #7dd3fc !important;
+    background: rgba(14, 165, 233, 0.12) !important;
+}
+
+.headLinkPrimary,
+.cmdLink {
+    color: #082f49 !important;
+    background: linear-gradient(135deg, #7dd3fc, #38bdf8) !important;
+    border-color: rgba(186, 230, 253, 0.55) !important;
+}
+
+.select,
+.selectCompact,
+.searchInput,
+.search {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+    border: 1px solid rgba(148, 163, 184, 0.28) !important;
+    color-scheme: dark;
+}
+
+.select option,
+.selectCompact option {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+}
+
+.errorBanner,
+.errorBox,
+.error {
+    border-color: rgba(248, 113, 113, 0.35) !important;
+    background: rgba(127, 29, 29, 0.28) !important;
+    color: #fecaca !important;
+}
+
+.table th {
+    color: #94a3b8 !important;
+    background: rgba(2, 6, 23, 0.65) !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.12) !important;
+}
+
+.table td {
+    color: #cbd5e1 !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1) !important;
+}
+
+.statusActive,
+.badge_stable {
+    color: #86efac !important;
+    background: rgba(16, 185, 129, 0.14) !important;
+    border-color: rgba(74, 222, 128, 0.3) !important;
+}
+
+.card_critical,
+.badge_critical {
+    border-color: rgba(248, 113, 113, 0.35) !important;
+}
+
+.card_warning,
+.badge_warning {
+    border-color: rgba(251, 191, 36, 0.35) !important;
+}
+
+.chipActive {
+    border-color: rgba(56, 189, 248, 0.55) !important;
+    background: rgba(14, 165, 233, 0.2) !important;
+    color: #e0f2fe !important;
+}
+
+.sidebar {
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.96) 0%, rgba(8, 15, 30, 0.98) 100%) !important;
+    border-left: 1px solid rgba(56, 189, 248, 0.12) !important;
+}
+
+.mapFrame {
+    border: 1px solid rgba(186, 230, 253, 0.16) !important;
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45) !important;
+}
+
+.shell {
+    background: #020617 !important;
+}
+
+.panel h2,
+.panelWide h2,
+.sideHead h1,
+.cardBody h3 {
+    color: #f8fafc !important;
+}
+
+.rank {
+    color: #082f49 !important;
+    background: linear-gradient(135deg, #7dd3fc, #38bdf8) !important;
+}
+
+.insightValue,
+.insightValueSmall {
+    color: #f8fafc !important;
+}
+
+.insightLabel {
+    color: #67e8f9 !important;
+}
+
+.horizonBtn {
+    color: #94a3b8 !important;
+}
+
+.horizonBtnActive {
+    color: #e0f2fe !important;
+    background: rgba(56, 189, 248, 0.22) !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+}
+
+/* analytics filters select is local class chain - only use if class exists via :global for filters */
+

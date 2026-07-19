@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -6,56 +6,52 @@ import { useState, useEffect } from "react";
 import styles from "./Navbar.module.css";
 
 const baseLinks = [
-    { href: "/", label: "Home", icon: "" },
-    { href: "/dashboard", label: "Dashboard", icon: "" },
-    { href: "/map", label: "Map", icon: "" },
-    { href: "/stations", label: "Stations", icon: "" },
+    { href: "/", label: "Home" },
+    { href: "/map", label: "Map" },
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/terrain", label: "Terrain" },
+    { href: "/analytics", label: "Analytics" },
+    { href: "/stations", label: "Stations" },
 ];
 
+function isActive(pathname, href) {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(href + "/");
+}
+
 export default function Navbar() {
-    const pathname = usePathname();
+    const pathname = usePathname() || "/";
     const [isOpen, setIsOpen] = useState(false);
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
     useEffect(() => {
-        // Read auth token from localStorage on mount
-        const checkAuth = () => {
-            const token = localStorage.getItem("admin_token");
-            setIsAdminLoggedIn(!!token);
-        };
-
+        const checkAuth = () => setIsAdminLoggedIn(!!localStorage.getItem("admin_token"));
         checkAuth();
-
-        // Listen for login/logout events from other components
         window.addEventListener("admin-login", checkAuth);
         window.addEventListener("admin-logout", checkAuth);
-
         return () => {
             window.removeEventListener("admin-login", checkAuth);
             window.removeEventListener("admin-logout", checkAuth);
         };
     }, []);
 
-    // Create current list of links
     const navLinks = [...baseLinks];
-    if (isAdminLoggedIn) {
-        navLinks.push({ href: "/sync", label: "Sync Data", icon: "🔄" });
-    }
+    if (isAdminLoggedIn) navLinks.push({ href: "/admin", label: "Admin" });
 
     return (
         <nav className={styles.nav}>
             <div className={`container ${styles.navInner}`}>
-                <Link href="/" className={styles.logo}>
+                <Link href="/" className={styles.logo} onClick={() => setIsOpen(false)}>
                     <span className={styles.logoText}>DWLR Monitor</span>
                 </Link>
 
-                {/* Mobile Toggle */}
-                <button 
-                    className={styles.mobileToggle} 
+                <button
+                    className={styles.mobileToggle}
                     onClick={() => setIsOpen(!isOpen)}
                     aria-label="Toggle Menu"
+                    aria-expanded={isOpen}
                 >
-                    <div className={`${styles.hamburger} ${isOpen ? styles.open : ""}`}></div>
+                    <div className={`${styles.hamburger} ${isOpen ? styles.open : ""}`} />
                 </button>
 
                 <ul className={`${styles.links} ${isOpen ? styles.linksOpen : ""}`}>
@@ -63,12 +59,11 @@ export default function Navbar() {
                         <li key={link.href}>
                             <Link
                                 href={link.href}
-                                className={`${styles.link} ${pathname === link.href ? styles.active : ""} ${
-                                    link.href === "/sync" ? styles.syncBtn : ""
+                                className={`${styles.link} ${isActive(pathname, link.href) ? styles.active : ""} ${
+                                    link.href === "/admin" ? styles.syncBtn : ""
                                 }`}
                                 onClick={() => setIsOpen(false)}
                             >
-                                <span className={styles.linkIcon}>{link.icon}</span>
                                 {link.label}
                             </Link>
                         </li>

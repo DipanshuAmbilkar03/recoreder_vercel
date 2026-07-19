@@ -1,22 +1,123 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import dynamic from "next/dynamic";
+import { API_URL } from "@/lib/api";
 import styles from "./page.module.css";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-// Dynamic imports
-const WaterLevelTrendChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.WaterLevelTrendChart), { ssr: false });
-const DistrictComparisonChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.DistrictComparisonChart), { ssr: false });
-const AquiferProfileLineChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.AquiferProfileLineChart), { ssr: false });
-const InfrastructureStatusLineChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.InfrastructureStatusLineChart), { ssr: false });
-const DepthBandLineChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.DepthBandLineChart), { ssr: false });
-const SeasonalMomentumLineChart = dynamic(() => import("@/components/Charts/ChartComponents").then(m => m.SeasonalMomentumLineChart), { ssr: false });
-const StationInsightPanel = dynamic(() => import("@/components/Charts/StationInsightPanel").then(m => m.StationInsightPanel), { ssr: false });
+const WaterLevelTrendChart = dynamic(
+    () => import("@/components/Charts/ChartComponents").then((m) => m.WaterLevelTrendChart),
+    { ssr: false }
+);
 const ForecastChart = dynamic(() => import("@/components/Charts/ForecastChart"), { ssr: false });
+const AquiferProfileLineChart = dynamic(
+    () => import("@/components/Charts/ChartComponents").then((m) => m.AquiferProfileLineChart),
+    { ssr: false }
+);
+const InfrastructureStatusLineChart = dynamic(
+    () => import("@/components/Charts/ChartComponents").then((m) => m.InfrastructureStatusLineChart),
+    { ssr: false }
+);
+const DepthBandLineChart = dynamic(
+    () => import("@/components/Charts/ChartComponents").then((m) => m.DepthBandLineChart),
+    { ssr: false }
+);
+const SeasonalMomentumLineChart = dynamic(
+    () => import("@/components/Charts/ChartComponents").then((m) => m.SeasonalMomentumLineChart),
+    { ssr: false }
+);
+const StationInsightPanel = dynamic(
+    () => import("@/components/Charts/StationInsightPanel").then((m) => m.StationInsightPanel),
+    { ssr: false }
+);
+
+function MetricIcon({ type }) {
+    if (type === "stations") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h16M6 20V9l6-4 6 4v11M9 12h6M9 15h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    if (type === "depth") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v18M8 15l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    if (type === "active") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M9.5 12.5l1.8 1.8 3.7-4.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        );
+    }
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01M10.3 4.8 2.8 18a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.8a2 2 0 0 0-3.4 0Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function deriveAiInsights(forecastData, forecastMetadata, currentLevel) {
+    if (!forecastData?.length) {
+        return {
+            risk: "Awaiting data",
+            riskTone: "muted",
+            riskDetail: "Select a station with history to generate risk assessment.",
+            confidence: "—",
+            confidenceDetail: "Model confidence appears after a successful forecast run.",
+            recommendation: "Choose a DWLR station and forecast horizon.",
+            endLevel: null,
+            delta: null,
+        };
+    }
+
+    const end = Number(forecastData[forecastData.length - 1]?.predicted);
+    // Compare depth-to-water magnitudes so sign differences never invert risk.
+    const endAbs = Number.isFinite(end) ? Math.abs(end) : NaN;
+    const startRaw = Number.isFinite(currentLevel) ? currentLevel : Number(forecastData[0]?.predicted);
+    const startAbs = Number.isFinite(startRaw) ? Math.abs(startRaw) : NaN;
+    const delta = Number.isFinite(endAbs) && Number.isFinite(startAbs) ? endAbs - startAbs : null;
+    const mae = Number(forecastMetadata?.mae);
+    const confidence = Number.isFinite(mae)
+        ? Math.max(55, Math.min(96, Math.round(100 - mae * 12)))
+        : 78;
+
+    let risk = "Stable";
+    let riskTone = "safe";
+    let riskDetail = "Projected water-level path stays within a manageable band.";
+    let recommendation = "Maintain current monitoring cadence and continue weekly review.";
+
+    if (delta != null && delta > 1.5) {
+        risk = "Rising stress";
+        riskTone = "warn";
+        riskDetail = `Depth-to-water may increase by ~${delta.toFixed(2)} m over the selected horizon.`;
+        recommendation = "Prioritize high-stress districts and raise alert attention.";
+    } else if (delta != null && delta < -1.0) {
+        risk = "Recovery likely";
+        riskTone = "safe";
+        riskDetail = `Model expects improvement of ~${Math.abs(delta).toFixed(2)} m.`;
+        recommendation = "Use the recovery window for recharge planning.";
+    }
+
+    return {
+        risk,
+        riskTone,
+        riskDetail,
+        confidence: `${confidence}%`,
+        confidenceDetail: Number.isFinite(mae)
+            ? `Based on model MAE ${mae.toFixed(2)} m.`
+            : "Estimated from available forecast quality.",
+        recommendation,
+        endLevel: Number.isFinite(endAbs) ? endAbs : null,
+        delta,
+    };
+}
 
 function DashboardPageContent() {
     const searchParams = useSearchParams();
@@ -24,204 +125,316 @@ function DashboardPageContent() {
 
     const [stats, setStats] = useState(null);
     const [stations, setStations] = useState([]);
+    const [selectedState, setSelectedState] = useState("");
     const [selectedStation, setSelectedStation] = useState(null);
-    const [selectedState, setSelectedState] = useState("Maharashtra");
     const [trendPeriod, setTrendPeriod] = useState("daily");
     const [trendData, setTrendData] = useState([]);
-    
-    // Advanced Analytics State
+    const [forecastDays, setForecastDays] = useState(30);
+    const [forecastData, setForecastData] = useState([]);
+    const [forecastLoading, setForecastLoading] = useState(false);
+    const [forecastMetadata, setForecastMetadata] = useState(null);
     const [aquiferData, setAquiferData] = useState([]);
     const [statusData, setStatusData] = useState([]);
     const [correlationData, setCorrelationData] = useState([]);
     const [seasonalData, setSeasonalData] = useState([]);
-    const [districtInsights, setDistrictInsights] = useState([]);
-    const [districtComparison, setDistrictComparison] = useState([]);
-
-    // Forecasting State
-    const [forecastData, setForecastData] = useState([]);
-    const [forecastDays, setForecastDays] = useState(30);
-    const [forecastLoading, setForecastLoading] = useState(false);
-    const [forecastMetadata, setForecastMetadata] = useState(null);
-
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
+                setError(null);
                 const [
-                    overview, 
-                    stationList, 
-                    aquifers, 
-                    status, 
-                    correlation, 
-                    seasonal, 
-                    insights,
-                    comparison
+                    overview,
+                    stationList,
+                    aquifers,
+                    status,
+                    correlation,
+                    seasonal,
                 ] = await Promise.all([
                     axios.get(`${API_URL}/analytics/overview`),
-                    axios.get(`${API_URL}/stations?limit=200`),
+                    axios.get(`${API_URL}/stations?limit=2000`),
                     axios.get(`${API_URL}/analytics/aquifers`),
                     axios.get(`${API_URL}/analytics/status-distribution`),
                     axios.get(`${API_URL}/analytics/depth-correlation`),
                     axios.get(`${API_URL}/analytics/seasonal-trends`),
-                    axios.get(`${API_URL}/analytics/district-insights`),
-                    axios.get(`${API_URL}/analytics/districts`)
                 ]);
 
                 setStats(overview.data);
                 const st = stationList.data.data || [];
                 setStations(st);
-                
-                let targetStation = null;
+                setAquiferData(aquifers.data || []);
+                setStatusData(status.data || []);
+                setCorrelationData(correlation.data || []);
+                setSeasonalData(seasonal.data || []);
+
+                let target = null;
                 if (stationIdParam) {
-                    const id = parseInt(stationIdParam, 10);
-                    targetStation = st.find(s => s.station_id === id);
+                    target = st.find((s) => s.station_id === parseInt(stationIdParam, 10));
                 }
-                const initialStation = targetStation || st.find(s => s.state === "Maharashtra") || st[0];
-                if (initialStation) {
-                    setSelectedStation(initialStation);
-                    if (initialStation.state) {
-                        setSelectedState(initialStation.state);
-                    }
+                const initial = target || st[0] || null;
+                if (initial) {
+                    setSelectedStation(initial);
+                    if (initial.state) setSelectedState(initial.state);
                 }
-                
-                setAquiferData(aquifers.data);
-                setStatusData(status.data);
-                setCorrelationData(correlation.data);
-                setSeasonalData(seasonal.data);
-                setDistrictInsights(insights.data);
-                setDistrictComparison(comparison.data);
             } catch (err) {
-                console.error("Dashboard Fetch Error:", err);
+                console.error(err);
+                setError("Failed to load dashboard data. Is the backend running?");
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [stationIdParam]);
-
-    useEffect(() => {
-        if (stationIdParam && stations.length > 0) {
-            const id = parseInt(stationIdParam, 10);
-            const target = stations.find(s => s.station_id === id);
-            if (target) {
-                setSelectedStation(target);
-                if (target.state) {
-                    setSelectedState(target.state);
-                }
-            }
-        }
-    }, [stationIdParam, stations]);
+    }, [stationIdParam, refreshKey]);
 
     useEffect(() => {
         if (!selectedStation) return;
-        const fetchTrends = async () => {
+        const run = async () => {
             try {
-                // Clear old trend data to let animation show "empty" or transition correctly
-                // setTrendData([]); // Optional: could cause flash, better to just update prop
-                const res = await axios.get(`${API_URL}/analytics/trends?station_id=${selectedStation.station_id}&period=${trendPeriod}`);
+                const res = await axios.get(
+                    `${API_URL}/analytics/trends?station_id=${selectedStation.station_id}&period=${trendPeriod}`
+                );
                 setTrendData(res.data || []);
             } catch (err) {
-                console.error("Trend Fetch Error:", err);
+                console.error(err);
+                setTrendData([]);
             }
         };
-        fetchTrends();
-    }, [selectedStation?.station_id, trendPeriod]); // Use station_id specifically
+        run();
+    }, [selectedStation?.station_id, trendPeriod]);
 
     useEffect(() => {
         if (!selectedStation) return;
-        const fetchForecast = async () => {
+        const run = async () => {
             try {
                 setForecastLoading(true);
-                const res = await axios.get(`${API_URL}/forecast/${selectedStation.station_id}?days=${forecastDays}`);
+                const res = await axios.get(
+                    `${API_URL}/forecast/${selectedStation.station_id}?days=${forecastDays}`
+                );
                 setForecastData(res.data.forecast || []);
                 setForecastMetadata(res.data.metadata || null);
             } catch (err) {
-                console.error("Forecast Fetch Error:", err);
+                console.error(err);
                 setForecastData([]);
                 setForecastMetadata(null);
             } finally {
                 setForecastLoading(false);
             }
         };
-        fetchForecast();
+        run();
     }, [selectedStation?.station_id, forecastDays]);
 
+    const availableStates = useMemo(
+        () => Array.from(new Set(stations.map((s) => s.state).filter(Boolean))).sort(),
+        [stations]
+    );
+    const filteredStations = useMemo(
+        () => (selectedState ? stations.filter((s) => s.state === selectedState) : stations),
+        [stations, selectedState]
+    );
+
+    const currentWaterLevel = useMemo(() => {
+        // Prefer the station's latest real reading so dashboard matches map/stations.
+        if (selectedStation?.latest_water_level != null) {
+            const n = Number(selectedStation.latest_water_level);
+            return Number.isFinite(n) ? n : null;
+        }
+        if (trendData.length > 0 && trendData[0].avg_level != null) {
+            const n = Number(trendData[0].avg_level);
+            return Number.isFinite(n) ? n : null;
+        }
+        return null;
+    }, [trendData, selectedStation]);
+
+    const wellDepth =
+        selectedStation?.well_depth != null && Number.isFinite(Number(selectedStation.well_depth))
+            ? Number(selectedStation.well_depth)
+            : null;
+
+    const insights = useMemo(
+        () => deriveAiInsights(forecastData, forecastMetadata, currentWaterLevel),
+        [forecastData, forecastMetadata, currentWaterLevel]
+    );
+
     const metrics = [
-        { label: "Total Stations", value: stats?.total_stations || "—", icon: null, color: "#3b82f6" },
-        { label: "Avg Depth", value: stats?.avg_water_level ? `${stats.avg_water_level}m` : "—", icon: null, color: "#06b6d4" },
-        { label: "Active Nodes", value: stats?.active_stations || "—", icon: "🟢", color: "#10b981" },
-        { label: "Critical Low", value: stats?.min_water_level ? `${stats.min_water_level}m` : "—", icon: "🔴", color: "#ef4444" },
-        { label: "Peak Level", value: stats?.max_water_level ? `${stats.max_water_level}m` : "—", icon: "🟡", color: "#f59e0b" },
+        {
+            label: "Total Stations",
+            value: stats?.total_stations ?? "—",
+            icon: "stations",
+            color: "#38bdf8",
+            hint: "Network coverage",
+        },
+        {
+            label: "Active Nodes",
+            value: stats?.active_stations ?? "—",
+            icon: "active",
+            color: "#34d399",
+            hint: "Live telemetry",
+        },
+        {
+            label: "Avg Depth",
+            value: stats?.avg_water_level != null ? `${stats.avg_water_level}m` : "—",
+            icon: "depth",
+            color: "#22d3ee",
+            hint: "Depth to water",
+        },
+        {
+            label: "Open Alerts",
+            value: stats?.open_alerts ?? "—",
+            icon: "critical",
+            color: "#f87171",
+            hint: "Unresolved",
+        },
     ];
-
-    // Helper to get current water level for illustration
-    const currentWaterLevel = trendData.length > 0 
-        ? Number(trendData[0].avg_level) 
-        : (selectedStation?.water_level ? Number(selectedStation.water_level) : (stats?.avg_water_level ? Number(stats.avg_water_level) : null));
-
-    // Derived filtering data
-    const availableStates = Array.from(new Set(stations.map(s => s.state))).filter(Boolean).sort();
-    const filteredStations = selectedState 
-        ? stations.filter(s => s.state === selectedState) 
-        : stations;
 
     return (
         <main className={styles.main}>
             <div className="container">
-                {/* ... (Header stays same) ... */}
                 <header className={styles.header}>
-                    <h1 className={styles.title}>DWLR Intelligence Terminal</h1>
-                    <p className={styles.subtitle}>Real-time groundwater monitoring & predictive diagnostics</p>
+                    <div className={styles.headerCopy}>
+                        <div className={styles.kicker}>Dashboard</div>
+                        <h1 className={styles.title}>Station graphs & insight</h1>
+                        <p className={styles.subtitle}>
+                            Station water level animation, trends, AI forecast, and network diagnostic charts.
+                        </p>
+                    </div>
+                    <div className={styles.headerActions}>
+                        <div className={styles.horizonGroup} role="group" aria-label="Forecast horizon">
+                            {[7, 30, 90].map((d) => (
+                                <button
+                                    key={d}
+                                    type="button"
+                                    className={`${styles.horizonBtn} ${forecastDays === d ? styles.horizonBtnActive : ""}`}
+                                    onClick={() => setForecastDays(d)}
+                                >
+                                    {d}d
+                                </button>
+                            ))}
+                        </div>
+                        <div className={styles.headerFilters}>
+                            <select
+                                className={styles.select}
+                                value={selectedState}
+                                onChange={(e) => {
+                                    const newState = e.target.value;
+                                    setSelectedState(newState);
+                                    const fs = newState
+                                        ? stations.filter((s) => s.state === newState)
+                                        : stations;
+                                    if (fs[0]) setSelectedStation(fs[0]);
+                                }}
+                            >
+                                <option value="">All States</option>
+                                {availableStates.map((st) => (
+                                    <option key={st} value={st}>
+                                        {st}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                className={styles.select}
+                                value={selectedStation?.station_id || ""}
+                                onChange={(e) => {
+                                    const id = parseInt(e.target.value, 10);
+                                    const st = filteredStations.find((s) => s.station_id === id);
+                                    setSelectedStation(st || null);
+                                }}
+                            >
+                                {filteredStations.map((s) => (
+                                    <option key={s.station_id} value={s.station_id}>
+                                        {s.station_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                 </header>
 
-                {/* ... (Metrics stay same) ... */}
-                <section className={styles.metricsRow}>
+                {error && (
+                    <div className={styles.errorBanner} role="alert">
+                        <strong>Connection issue</strong>
+                        <span>{error}</span>
+                        <button
+                            type="button"
+                            className={styles.retryBtn}
+                            onClick={() => setRefreshKey((k) => k + 1)}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                )}
+
+                <section className={styles.metricsRow} aria-label="Network overview metrics">
                     {metrics.map((m, i) => (
-                        <div key={i} className={styles.metricCard} style={{"--accent": m.color}}>
-                            <span className={styles.metricIcon}>{m.icon}</span>
+                        <div key={i} className={styles.metricCard} style={{ "--accent": m.color }}>
+                            <div className={styles.metricIconWrap} style={{ color: m.color }}>
+                                <MetricIcon type={m.icon} />
+                            </div>
                             <div className={styles.metricInfo}>
-                                <div className={styles.metricValue}>{m.value}</div>
                                 <div className={styles.metricLabel}>{m.label}</div>
+                                <div className={styles.metricValue}>{loading ? "..." : m.value}</div>
+                                <div className={styles.metricHint}>{m.hint}</div>
                             </div>
                         </div>
                     ))}
                 </section>
 
-                {/* 3. Main Analytics Grid */}
-                <div className={styles.mainGrid}>
-                    <section className={`${styles.panel} ${styles.trendPanel}`}>
+                {/* Station water-level insight */}
+                <section className={styles.secondaryGrid} aria-label="Station insight">
+                    <article className={`${styles.panel} ${styles.insightCard}`}>
                         <div className={styles.panelHeader}>
-                            <h2 className={styles.panelTitle}> Water Level Monitoring</h2>
-                            <div className={styles.panelControls}>
-                                <select 
-                                    className={styles.select}
-                                    value={selectedState}
-                                    onChange={(e) => {
-                                        const newState = e.target.value;
-                                        setSelectedState(newState);
-                                        // Reset selected station to the first one in the new filtered list
-                                        const fs = newState ? stations.filter(s => s.state === newState) : stations;
-                                        if (fs.length > 0) setSelectedStation(fs[0]);
-                                    }}
-                                >
-                                    <option value="">All States</option>
-                                    {availableStates.map(st => <option key={st} value={st}>{st}</option>)}
-                                </select>
-                                <select 
-                                    className={styles.select}
-                                    onChange={(e) => {
-                                        const id = parseInt(e.target.value);
-                                        const st = filteredStations.find(s => s.station_id === id);
-                                        setSelectedStation(st); 
-                                    }}
-                                    value={selectedStation?.station_id || ""}
-                                >
-                                    {filteredStations.map(s => <option key={s.station_id} value={s.station_id}>{s.station_name} ({s.district})</option>)}
-                                </select>
-                                <select 
-                                    className={styles.select}
+                            <h2 className={styles.panelTitle}>Station insight</h2>
+                            {selectedStation && (
+                                <span className={styles.metaChip}>
+                                    {selectedStation.district || "District"} · {selectedStation.state || "State"}
+                                </span>
+                            )}
+                        </div>
+                        {selectedStation ? (
+                            <StationInsightPanel
+                                stationData={selectedStation}
+                                wellDepth={wellDepth}
+                                waterLevel={currentWaterLevel}
+                            />
+                        ) : (
+                            <p className={styles.emptyMsg}>Select a station for deep insight</p>
+                        )}
+                    </article>
+                </section>
+
+                {/* Station graphs */}
+                <section className={styles.forecastSection} aria-label="Station graphs and AI forecast">
+                    <div className={styles.sectionBar}>
+                        <div>
+                            <h2 className={styles.sectionTitle}>
+                                {selectedStation?.station_name || "Station"} graphs
+                            </h2>
+                            <p className={styles.sectionNote}>
+                                Historical trend + AI forecast for selected DWLR station
+                            </p>
+                        </div>
+                        <div className={styles.sectionMeta}>
+                            <span className={styles.livePill}>
+                                <span className={styles.liveDot} />
+                                AI Forecast
+                            </span>
+                            {forecastMetadata?.model_type && (
+                                <span className={styles.metaChip}>{forecastMetadata.model_type}</span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className={styles.dualChartGrid}>
+                        <article className={styles.chartCard}>
+                            <div className={styles.chartCardHeader}>
+                                <div>
+                                    <h3 className={styles.chartCardTitle}>Water Level Trend</h3>
+                                    <p className={styles.chartCardSub}>Observed depth-to-water over time</p>
+                                </div>
+                                <select
+                                    className={styles.selectCompact}
                                     value={trendPeriod}
                                     onChange={(e) => setTrendPeriod(e.target.value)}
                                 >
@@ -230,84 +443,110 @@ function DashboardPageContent() {
                                     <option value="yearly">Yearly</option>
                                 </select>
                             </div>
-                        </div>
-                        <div className={styles.chartBox}>
-                            <WaterLevelTrendChart trendData={trendData} stationName={selectedStation?.station_name} />
-                        </div>
-                    </section>
-
-                    {/* AI Forecasting Panel */}
-                    <section className={`${styles.panel} ${styles.trendPanel}`}>
-                        <div className={styles.panelHeader}>
-                            <h2 className={styles.panelTitle}>AI Predictive Forecast</h2>
-                            <div className={styles.panelControls}>
-                                <select 
-                                    className={styles.select}
-                                    value={forecastDays}
-                                    onChange={(e) => setForecastDays(parseInt(e.target.value))}
-                                    disabled={forecastLoading}
-                                >
-                                    <option value={30}>30 Days Horizon</option>
-                                    <option value={60}>60 Days Horizon</option>
-                                    <option value={90}>90 Days Horizon</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className={styles.chartBox}>
-                            {forecastLoading ? (
-                                <div className={styles.loadingShimmer}>
-                                    <div className={styles.spinner}></div>
-                                    <p>Running time-series inference via Prophet ML model...</p>
-                                </div>
-                            ) : (
-                                <ForecastChart 
-                                    historicalData={trendData} 
-                                    forecastData={forecastData} 
-                                    stationName={selectedStation?.station_name} 
+                            <div className={styles.chartBox}>
+                                <WaterLevelTrendChart
+                                    trendData={trendData}
+                                    stationName={selectedStation?.station_name}
                                 />
-                            )}
-                        </div>
-                        {forecastMetadata && (
-                            <div className={styles.forecastMeta}>
-                                <span className={styles.metaItem}>Model Engine: <strong>{forecastMetadata.model_type}</strong></span>
-                                {forecastMetadata.mae > 0 && (
-                                    <span className={styles.metaItem}>Model Precision (MAE): <strong>{forecastMetadata.mae}m</strong></span>
-                                )}
-                                <span className={styles.metaItem}>Datasets Analyzed: <strong>{forecastMetadata.data_points_used} points</strong></span>
-                                {forecastMetadata.warning && (
-                                    <span className={styles.warningText}>⚠️ {forecastMetadata.warning}</span>
+                            </div>
+                        </article>
+
+                        <article className={styles.chartCard}>
+                            <div className={styles.chartCardHeader}>
+                                <div>
+                                    <h3 className={styles.chartCardTitle}>AI Level Forecast</h3>
+                                    <p className={styles.chartCardSub}>
+                                        {forecastDays}-day projection with confidence band
+                                    </p>
+                                </div>
+                                {insights.endLevel != null && (
+                                    <div className={styles.endpointBadge}>
+                                        <span>End level</span>
+                                        <strong>{insights.endLevel.toFixed(2)} m</strong>
+                                    </div>
                                 )}
                             </div>
-                        )}
-                    </section>
-                </div>
+                            <div className={styles.chartBox}>
+                                {forecastLoading ? (
+                                    <div className={styles.loadingShimmer}>
+                                        <div className={styles.spinner} />
+                                        Generating forecast...
+                                    </div>
+                                ) : (
+                                    <ForecastChart
+                                        historicalData={trendData}
+                                        forecastData={forecastData}
+                                        stationName={selectedStation?.station_name}
+                                    />
+                                )}
+                            </div>
+                            {forecastMetadata && (
+                                <div className={styles.forecastMeta}>
+                                    <span className={styles.metaItem}>
+                                        Engine: <strong>{forecastMetadata.model_type}</strong>
+                                    </span>
+                                    {forecastMetadata.mae > 0 && (
+                                        <span className={styles.metaItem}>
+                                            MAE: <strong>{forecastMetadata.mae}m</strong>
+                                        </span>
+                                    )}
+                                    <span className={styles.metaItem}>
+                                        Points: <strong>{forecastMetadata.data_points_used}</strong>
+                                    </span>
+                                    {forecastMetadata.warning && (
+                                        <span className={styles.warningText}>
+                                            {forecastMetadata.warning}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </article>
+                    </div>
+                </section>
 
-                <div className={styles.secondaryGrid}>
-                    <section className={`${styles.panel} ${styles.insightCard}`}>
-                        <h2 className={styles.panelTitle}>Station Insight</h2>
-                        {selectedStation ? (
-                            <StationInsightPanel 
-                                stationData={selectedStation} 
-                                wellDepth={selectedStation.well_depth} 
-                                waterLevel={currentWaterLevel} 
-                            />
-                        ) : (
-                            <p className={styles.emptyMsg}>Select a station for deep insight</p>
-                        )}
-                    </section>
-                </div>
+                <section className={styles.insightsSection}>
+                    <div className={styles.sectionBar}>
+                        <div>
+                            <h2 className={styles.sectionTitle}>AI Insights</h2>
+                            <p className={styles.sectionNote}>
+                                Operational readouts derived from the active forecast
+                            </p>
+                        </div>
+                    </div>
+                    <div className={styles.insightsGrid}>
+                        <article className={`${styles.insightTile} ${styles[`tone_${insights.riskTone}`] || ""}`}>
+                            <div className={styles.insightLabel}>Risk Assessment</div>
+                            <div className={styles.insightValue}>{insights.risk}</div>
+                            <p className={styles.insightDetail}>{insights.riskDetail}</p>
+                        </article>
+                        <article className={styles.insightTile}>
+                            <div className={styles.insightLabel}>Confidence Level</div>
+                            <div className={styles.insightValue}>{insights.confidence}</div>
+                            <p className={styles.insightDetail}>{insights.confidenceDetail}</p>
+                        </article>
+                        <article className={styles.insightTile}>
+                            <div className={styles.insightLabel}>Recommendations</div>
+                            <div className={styles.insightValueSmall}>Next actions</div>
+                            <p className={styles.insightDetail}>{insights.recommendation}</p>
+                            {insights.delta != null && (
+                                <div className={styles.deltaChip}>
+                                    Delta {insights.delta > 0 ? "+" : ""}
+                                    {insights.delta.toFixed(2)} m
+                                </div>
+                            )}
+                        </article>
+                    </div>
+                </section>
 
-                    {/* Quick Stats or small panel here to balance width if needed */}
-
-                {/* 4. Advanced Diagnostics Section */}
-                <h3 className={styles.sectionHeading}> Advanced Diagnostics</h3>
+                {/* Previous network diagnostic graphs */}
+                <h3 className={styles.sectionHeading}>Network diagnostic graphs</h3>
                 <div className={styles.diagnosticsGrid}>
                     <div className={styles.miniPanel}>
-                        <h4 className={styles.miniTitle}>Aquifer Profile Line</h4>
+                        <h4 className={styles.miniTitle}>Aquifer Profile</h4>
                         <AquiferProfileLineChart aquiferData={aquiferData} />
                     </div>
                     <div className={styles.miniPanel}>
-                        <h4 className={styles.miniTitle}>Infrastructure Health Breakdown</h4>
+                        <h4 className={styles.miniTitle}>Infrastructure Status</h4>
                         <InfrastructureStatusLineChart statusData={statusData} />
                     </div>
                     <div className={styles.miniPanel}>
@@ -315,36 +554,9 @@ function DashboardPageContent() {
                         <DepthBandLineChart correlationData={correlationData} />
                     </div>
                     <div className={styles.miniPanel}>
-                        <h4 className={styles.miniTitle}>Seasonal Momentum (Y-o-Y)</h4>
+                        <h4 className={styles.miniTitle}>Seasonal Momentum</h4>
                         <SeasonalMomentumLineChart seasonalData={seasonalData} />
                     </div>
-                </div>
-
-                {/* 5. Regional Intelligence Section */}
-                <h3 className={styles.sectionHeading}> Regional Intelligence</h3>
-                <div className={styles.regionalGrid}>
-                    <section className={styles.panel}>
-                        <h2 className={styles.panelTitle}> District Comparison</h2>
-                        <DistrictComparisonChart districtData={districtComparison} />
-                    </section>
-                    
-                    <section className={styles.panel}>
-                        <h2 className={styles.panelTitle}>Critical Leaderboard</h2>
-                        <div className={styles.leaderboard}>
-                            {districtInsights.map((d, i) => (
-                                <div key={i} className={styles.leaderItem}>
-                                    <div className={styles.rank}>{i+1}</div>
-                                    <div className={styles.leaderInfo}>
-                                        <div className={styles.leaderName}>{d.district}</div>
-                                        <div className={styles.leaderMeta}>{d.reading_count} sensors reporting</div>
-                                    </div>
-                                    <div className={styles.leaderValue} style={{color: d.current_level > 10 ? '#ef4444' : '#10b981'}}>
-                                        {d.current_level}m
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
                 </div>
             </div>
         </main>
@@ -353,11 +565,13 @@ function DashboardPageContent() {
 
 export default function DashboardPage() {
     return (
-        <Suspense fallback={
-            <main className="container" style={{ marginTop: "120px", display: "flex", justifyContent: "center" }}>
-                <div style={{ color: "rgba(255, 255, 255, 0.6)" }}>Loading Dashboard Insights...</div>
-            </main>
-        }>
+        <Suspense
+            fallback={
+                <main className="container" style={{ marginTop: "120px", display: "flex", justifyContent: "center" }}>
+                    <div style={{ color: "rgba(255, 255, 255, 0.6)" }}>Loading Dashboard...</div>
+                </main>
+            }
+        >
             <DashboardPageContent />
         </Suspense>
     );

@@ -1,324 +1,291 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
-import Select from "react-select";
-import axios from "axios";
+import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
+import Link from "next/link";
 import styles from "./page.module.css";
 import Map from "@/components/Map";
+import {
+    formatDepthToWater,
+    stationWaterMetrics,
+    wellFillPercent,
+} from "@/lib/waterLevel";
+import { fetchStationsCached } from "@/lib/stationsCache";
 
-// Helper to determine the alert status based on water level and well depth
-function getAlertStatus(waterLevel, wellDepth) {
-    if (waterLevel === null || waterLevel === undefined || wellDepth === null || wellDepth === undefined) {
-        return { style: styles.cardWarning, badgeStyle: styles.badgeWarning, label: "UNKNOWN" };
-    }
-    
-    const effectiveDepth = Math.abs(Number(waterLevel));
-    const depth = Number(wellDepth);
-    
-    if (depth === 0) return { style: styles.cardWarning, badgeStyle: styles.badgeWarning, label: "UNKNOWN" };
+function getPercent(station) {
+    const fill = wellFillPercent(station.latest_water_level, station.well_depth, {
+        allowVisualFallback: true,
+    });
+    return fill == null ? null : Math.round(fill);
+}
 
-    const percentage = (effectiveDepth / depth) * 100;
-
-    if (percentage <= 33) {
-        return { style: styles.cardCritical, badgeStyle: styles.badgeCritical, label: "LOW" };
-    } else if (percentage <= 66) {
-        return { style: styles.cardWarning, badgeStyle: styles.badgeWarning, label: "MEDIUM" };
-    } else {
-        return { style: styles.cardNormal, badgeStyle: styles.badgeNormal, label: "HIGH" };
-    }
+function getRisk(station) {
+    const status = stationWaterMetrics(station);
+    if (status.key === "unknown") return { key: "unknown", label: "NO DATA", tone: "muted" };
+    if (status.key === "critical") return { key: "critical", label: "CRITICAL", tone: "critical" };
+    if (status.key === "warning") return { key: "warning", label: "WATCH", tone: "warning" };
+    return { key: "stable", label: "STABLE", tone: "stable" };
 }
 
 export default function MapPage() {
     const [stations, setStations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filterState, setFilterState] = useState("");
-    const [filterDistrict, setFilterDistrict] = useState("");
-    const [isMounted, setIsMounted] = useState(false);
-
-    // New State for Right Panel
     const [searchQuery, setSearchQuery] = useState("");
-    const [sortBy, setSortBy] = useState("alert");
+    const [filterMode, setFilterMode] = useState("all"); // all | active | critical | warning
+    const [sortBy, setSortBy] = useState("risk");
     const [selectedMapStation, setSelectedMapStation] = useState(null);
+    const [filterState, setFilterState] = useState("");
     const stationRefs = useRef({});
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-    // Derived filtering data for dynamic dropdowns
-    const availableMapStates = Array.from(new Set(stations.map(s => s.state))).filter(Boolean).sort();
-    const availableMapDistricts = filterState
-        ? Array.from(new Set(stations.filter(s => s.state === filterState).map(s => s.district))).filter(Boolean).sort()
-        : Array.from(new Set(stations.map(s => s.district))).filter(Boolean).sort();
-
-    // Format options for react-select
-    const stateOptions = availableMapStates.map(st => ({ value: st, label: st }));
-    const districtOptions = availableMapDistricts.map(dt => ({ value: dt, label: dt }));
-
-    // Custom styles for react-select to match dark theme
-    const customStyles = {
-        control: (provided, state) => ({
-            ...provided,
-            backgroundColor: 'rgba(15, 15, 15, 0.9)',
-            borderColor: state.isFocused ? 'rgba(163, 163, 163, 0.9)' : 'rgba(115, 115, 115, 0.35)',
-            boxShadow: state.isFocused ? '0 0 0 1px rgba(163, 163, 163, 0.7)' : 'none',
-            '&:hover': {
-                borderColor: 'rgba(163, 163, 163, 0.9)'
-            },
-            minHeight: '36px',
-            color: '#d1d5db',
-            fontSize: '0.8rem',
-            borderRadius: 'var(--radius-sm)'
-        }),
-        menu: (provided) => ({
-            ...provided,
-            backgroundColor: 'rgba(8, 8, 8, 0.98)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(115,115,115,0.3)'
-        }),
-        menuPortal: (provided) => ({
-            ...provided,
-            zIndex: 9999
-        }),
-        menuList: (provided) => ({
-            ...provided,
-            backgroundColor: 'transparent'
-        }),
-        option: (provided, state) => ({
-            ...provided,
-            backgroundColor: state.isSelected 
-                ? 'rgba(64, 64, 64, 0.85)' 
-                : state.isFocused 
-                    ? 'rgba(82, 82, 82, 0.6)' 
-                    : 'transparent',
-            color: '#d1d5db',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            '&:active': {
-                backgroundColor: 'rgba(64, 64, 64, 0.95)'
-            }
-        }),
-        singleValue: (provided) => ({
-            ...provided,
-            color: '#d1d5db',
-            fontSize: '0.8rem'
-        }),
-        input: (provided) => ({
-            ...provided,
-            color: '#d1d5db',
-            fontSize: '0.8rem'
-        }),
-        placeholder: (provided) => ({
-            ...provided,
-            color: 'rgba(156,163,175,0.8)',
-            fontSize: '0.78rem'
-        })
-    };
+    const deferredQuery = useDeferredValue(searchQuery);
 
     const fetchStations = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${API_URL}/stations?per_page=1000`);
-            setStations(res.data.data || []);
+            setError(null);
+            // force on explicit Refresh so user can bypass cache
+            const rows = await fetchStationsCached({ limit: 2000, force: true });
+            setStations(rows);
         } catch (err) {
-            console.error("Failed to load stations:", err);
-            setError("Failed to load station data from the server.");
+            console.error(err);
+            setError("Failed to load stations. Check backend connection.");
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchStations();
+        let cancelled = false;
+        (async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                // Use cache when available so revisiting map doesn't re-hit API
+                const rows = await fetchStationsCached({ limit: 2000 });
+                if (!cancelled) setStations(rows);
+            } catch (err) {
+                console.error(err);
+                if (!cancelled) setError("Failed to load stations. Check backend connection.");
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
+    const states = useMemo(
+        () => Array.from(new Set(stations.map((s) => s.state).filter(Boolean))).sort(),
+        [stations]
+    );
 
+    const filteredStations = useMemo(() => {
+        let list = [...stations];
 
-    // Keep map markers filterable by state/district without limiting sidebar data.
-    const mapStations = stations.filter(s => {
-        if (filterState && s.state !== filterState) return false;
-        if (filterDistrict && s.district !== filterDistrict) return false;
-        return true;
-    });
+        if (filterState) list = list.filter((s) => s.state === filterState);
 
-    const getAlertRank = (station) => {
-        const { label } = getAlertStatus(station.latest_water_level, station.well_depth);
-        if (label === "LOW") return 0;
-        if (label === "MEDIUM") return 1;
-        if (label === "HIGH") return 2;
-        return 3;
-    };
+        if (filterMode === "active") {
+            list = list.filter((s) => String(s.station_status || "").toLowerCase() === "active");
+        } else if (filterMode === "critical") {
+            list = list.filter((s) => getRisk(s).key === "critical");
+        } else if (filterMode === "warning") {
+            list = list.filter((s) => getRisk(s).key === "warning");
+        }
 
-    // Sidebar always shows all stations, ordered with alert stations first.
-    const filteredAndSortedStations = stations.filter(s => {
-        if (searchQuery && !s.station_name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-        return true;
-    }).sort((a, b) => {
-        const alertOrder = getAlertRank(a) - getAlertRank(b);
-        if (alertOrder !== 0) return alertOrder;
-        if (sortBy === 'alert') return (a.station_name || "").localeCompare(b.station_name || "");
-        if (sortBy === 'name') return (a.station_name || "").localeCompare(b.station_name || "");
-        if (sortBy === 'level') return (Number(a.latest_water_level) || 0) - (Number(b.latest_water_level) || 0);
-        if (sortBy === 'depth') return (Number(b.well_depth) || 0) - (Number(a.well_depth) || 0);
-        return 0;
-    });
+        if (deferredQuery.trim()) {
+            const q = deferredQuery.trim().toLowerCase();
+            list = list.filter((s) => {
+                const hay = `${s.station_name || ""} ${s.station_code || ""} ${s.district || ""} ${s.state || ""}`.toLowerCase();
+                return hay.includes(q);
+            });
+        }
+
+        list.sort((a, b) => {
+            if (sortBy === "name") return (a.station_name || "").localeCompare(b.station_name || "");
+            if (sortBy === "level") {
+                return Math.abs(Number(b.latest_water_level) || 0) - Math.abs(Number(a.latest_water_level) || 0);
+            }
+            // risk first
+            const order = { critical: 0, warning: 1, stable: 2, unknown: 3 };
+            return (order[getRisk(a).key] ?? 9) - (order[getRisk(b).key] ?? 9);
+        });
+
+        return list;
+    }, [stations, filterState, filterMode, deferredQuery, sortBy]);
+
+    const counts = useMemo(() => {
+        const base = filterState ? stations.filter((s) => s.state === filterState) : stations;
+        return {
+            all: base.length,
+            active: base.filter((s) => String(s.station_status || "").toLowerCase() === "active").length,
+            critical: base.filter((s) => getRisk(s).key === "critical").length,
+            warning: base.filter((s) => getRisk(s).key === "warning").length,
+        };
+    }, [stations, filterState]);
 
     const handleStationSelect = (station) => {
         setSelectedMapStation(station);
-        if (stationRefs.current[station.station_id]) {
-            stationRefs.current[station.station_id].scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-            });
-        }
+        const el = stationRefs.current[station.station_id];
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     };
 
     return (
-        <div className="container">
-            <div className={styles.header}>
-                <h1 className="section-title">Mapped Coverage</h1>
-                <p className="section-subtitle">Interactive visualization of all actively monitored DWLR stations.</p>
+        <div className={styles.shell}>
+            <div className={styles.mapPane}>
+                <div className={styles.mapFrame}>
+                    {error ? (
+                        <div className={styles.errorBox}>
+                            <p>{error}</p>
+                            <button type="button" onClick={fetchStations}>Retry</button>
+                        </div>
+                    ) : (
+                        <Map
+                            stations={filteredStations}
+                            selectedStation={selectedMapStation}
+                            onStationSelect={handleStationSelect}
+                        />
+                    )}
+
+                    <div className={styles.mapChips}>
+                        <button
+                            type="button"
+                            className={`${styles.chip} ${filterMode === "all" ? styles.chipActive : ""}`}
+                            onClick={() => setFilterMode("all")}
+                        >
+                            ALL <span>{counts.all}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.chip} ${filterMode === "active" ? styles.chipActive : ""}`}
+                            onClick={() => setFilterMode("active")}
+                        >
+                            Active <span>{counts.active}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.chip} ${styles.chipWarn} ${filterMode === "warning" ? styles.chipActive : ""}`}
+                            onClick={() => setFilterMode("warning")}
+                        >
+                            Medium <span>{counts.warning}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.chip} ${styles.chipDanger} ${filterMode === "critical" ? styles.chipActive : ""}`}
+                            onClick={() => setFilterMode("critical")}
+                        >
+                            Critical <span>{counts.critical}</span>
+                        </button>
+                    </div>
+
+                    {loading && <div className={styles.mapLoading}>Loading stations...</div>}
+                </div>
             </div>
 
-            <div className={styles.mapContainer}>
-                {/* Top Filter Bar */}
-                <div className={styles.topFilterBar}>
-                    <div className={styles.filterGroup}>
-                        <label>State</label>
-                        <Select
-                            options={stateOptions}
-                            value={stateOptions.find(opt => opt.value === filterState) || null}
-                            onChange={(selectedOption) => {
-                                setFilterState(selectedOption ? selectedOption.value : "");
-                                setFilterDistrict(""); // reset district on state change
-                            }}
-                            styles={customStyles}
-                            placeholder="All States"
-                            isClearable
-                            classNamePrefix="react-select"
-                            menuPortalTarget={isMounted ? document.body : null}
-                        />
+            <aside className={styles.sidebar}>
+                <div className={styles.sideHead}>
+                    <div>
+                        <h1>DWLR Station Map</h1>
+                        <p>Live network locations with well-fill markers (same formula as dashboard)</p>
                     </div>
-
-                    <div className={styles.filterGroup}>
-                        <label>District</label>
-                        <Select
-                            options={districtOptions}
-                            value={districtOptions.find(opt => opt.value === filterDistrict) || null}
-                            onChange={(selectedOption) => setFilterDistrict(selectedOption ? selectedOption.value : "")}
-                            styles={customStyles}
-                            placeholder="All Districts"
-                            isDisabled={!filterState}
-                            isClearable
-                            classNamePrefix="react-select"
-                            menuPortalTarget={isMounted ? document.body : null}
-                        />
-                    </div>
-
-                    <div className={styles.statsInline}>
-                        {loading && <div className={styles.spinnerSmall}></div>}
-                        {!error && (
-                            <>
-                                <h4>Showing:</h4>
-                                <span className={styles.statBadge}>{stations.length} Stations</span>
-                            </>
-                        )}
-                    </div>
+                    <button type="button" className={styles.refreshBtn} onClick={fetchStations} disabled={loading}>
+                        Refresh
+                    </button>
                 </div>
 
-                {/* 70/30 Split Layout */}
-                <div className={styles.contentWrapper}>
-                    {/* Left: Map Section */}
-                    <div className={styles.mapSection}>
-                        {error ? (
-                            <div className={styles.errorBox}>{error}</div>
-                        ) : (
-                            <Map 
-                                stations={mapStations} 
-                                selectedStation={selectedMapStation} 
-                                onStationSelect={handleStationSelect} 
-                            />
-                        )}
-                    </div>
+                <div className={styles.controls}>
+                    <input
+                        className={styles.search}
+                        type="search"
+                        placeholder="Search stations..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <select
+                        className={styles.select}
+                        value={filterState}
+                        onChange={(e) => setFilterState(e.target.value)}
+                    >
+                        <option value="">All states</option>
+                        {states.map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                        ))}
+                    </select>
+                    <select
+                        className={styles.select}
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                    >
+                        <option value="risk">Sort: Risk</option>
+                        <option value="name">Sort: Name</option>
+                        <option value="level">Sort: Level</option>
+                    </select>
+                </div>
 
-                    {/* Right: Stations Panel */}
-                    <div className={styles.stationsPanel}>
-                        <div className={styles.panelHeader}>
-                            <h2 className={styles.panelTitle}>Stations Overview ({filteredAndSortedStations.length})</h2>
-                            <div className={styles.panelControls}>
-                                <input 
-                                    type="text" 
-                                    className={styles.searchInput} 
-                                    placeholder="Search by name..." 
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                                <select 
-                                    className={styles.sortSelect} 
-                                    value={sortBy} 
-                                    onChange={(e) => setSortBy(e.target.value)}
+                <div className={styles.listMeta}>
+                    Showing <strong>{filteredStations.length}</strong> stations
+                </div>
+
+                <div className={styles.list}>
+                    {filteredStations.length === 0 && !loading ? (
+                        <div className={styles.empty}>No stations match filters.</div>
+                    ) : (
+                        filteredStations.map((station) => {
+                            const risk = getRisk(station);
+                            const pct = getPercent(station);
+                            const selected = selectedMapStation?.station_id === station.station_id;
+                            return (
+                                <article
+                                    key={station.station_id}
+                                    ref={(el) => {
+                                        stationRefs.current[station.station_id] = el;
+                                    }}
+                                    className={`${styles.card} ${styles[`card_${risk.tone}`] || ""} ${selected ? styles.cardSelected : ""}`}
+                                    onClick={() => handleStationSelect(station)}
                                 >
-                                    <option value="alert">Sort by Alert Priority</option>
-                                    <option value="name">Sort by Name</option>
-                                    <option value="level">Sort by Water Level</option>
-                                    <option value="depth">Sort by Well Depth</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className={styles.stationsList}>
-                            {filteredAndSortedStations.length > 0 ? (
-                                filteredAndSortedStations.map(station => {
-                                    const alert = getAlertStatus(station.latest_water_level, station.well_depth);
-                                    
-                                    return (
-                                        <div 
-                                            key={station.station_id} 
-                                            ref={(el) => (stationRefs.current[station.station_id] = el)}
-                                            className={`${styles.stationCard} ${alert.style} ${selectedMapStation?.station_id === station.station_id ? styles.selected : ''}`}
-                                            onClick={() => handleStationSelect(station)}
-                                        >
-                                            <div className={styles.cardTopLeft}>
-                                                <div className={`${styles.alertBadge} ${alert.badgeStyle}`}>
-                                                    {alert.label}
-                                                </div>
-                                            </div>
-                                            <div className={styles.cardHeader}>
-                                                <div className={styles.cardTitle}>{station.station_name}</div>
-                                                <div className={styles.cardSubtitle}>{station.district}, {station.state}</div>
-                                            </div>
-                                            <div className={styles.cardMetrics}>
-                                                <div className={styles.metric}>
-                                                    <label>Water Level</label>
-                                                    <span>{station.latest_water_level !== null && station.latest_water_level !== undefined ? `${station.latest_water_level} m` : 'N/A'}</span>
-                                                </div>
-                                                <div className={styles.metric}>
-                                                    <label>Well Depth</label>
-                                                    <span>{station.well_depth || 'N/A'} m</span>
-                                                </div>
-                                            </div>
-                                            <div className={styles.cardFooter}>
-                                                <div className={styles.metric}>
-                                                    <label>Aquifer</label>
-                                                    <span>{station.aquifer_type || 'Unknown'}</span>
-                                                </div>
-                                                <div className={`${styles.statusIndicator} ${station.station_status === 'Active' ? styles.active : styles.inactive}`}>
-                                                    {station.station_status || 'Active'}
-                                                </div>
-                                            </div>
+                                    <div className={styles.cardTop}>
+                                        <span className={`${styles.badge} ${styles[`badge_${risk.tone}`] || ""}`}>
+                                            {risk.label}
+                                        </span>
+                                        <span className={styles.statusPill}>
+                                            {String(station.station_status || "active").toLowerCase()}
+                                        </span>
+                                    </div>
+                                    <div className={styles.cardBody}>
+                                        <div>
+                                            <h3>{station.station_name}</h3>
+                                            <p>
+                                                {station.district || "District"}, {station.state || "State"}
+                                            </p>
+                                            <p className={styles.code}>{station.station_code}</p>
                                         </div>
-                                    );
-                                })
-                            ) : (
-                                <div className={styles.emptyState}>No stations found matching filters.</div>
-                            )}
-                        </div>
-                    </div>
+                                        <div className={styles.cardMetric}>
+                                            <strong>{pct == null ? "—" : `${pct}%`}</strong>
+                                            <span>well fill</span>
+                                            <em>
+                                                {formatDepthToWater(station.latest_water_level)} bgl
+                                            </em>
+                                        </div>
+                                    </div>
+                                    <div className={styles.cardActions}>
+                                        <Link
+                                            href={`/dashboard?station_id=${station.station_id}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            Dashboard
+                                        </Link>
+                                        <Link
+                                            href={`/analytics?station_id=${station.station_id}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            Graphs
+                                        </Link>
+                                    </div>
+                                </article>
+                            );
+                        })
+                    )}
                 </div>
-            </div>
+            </aside>
         </div>
     );
 }

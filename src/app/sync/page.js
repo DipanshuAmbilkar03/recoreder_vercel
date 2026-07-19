@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { API_URL } from "@/lib/api";
 import styles from "./page.module.css";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -31,8 +32,7 @@ export default function SyncPage() {
         enddate: today
     });
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
+    
     // ── Secure Session Check ──
     useEffect(() => {
         const checkAuth = async () => {
@@ -219,7 +219,7 @@ export default function SyncPage() {
                                     <div className={styles.spinnerSmall}></div>
                                     Downloading Data...
                                 </>
-                            ) : "⬇️ Execute Sync"}
+                            ) : "â¬‡ï¸ Execute Sync"}
                         </button>
 
                         {syncMessage && (
@@ -234,3 +234,4 @@ export default function SyncPage() {
         </main>
     );
 }
+

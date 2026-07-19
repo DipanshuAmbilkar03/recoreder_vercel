@@ -14,7 +14,6 @@ import {
 } from "chart.js";
 import styles from "./ForecastChart.module.css";
 
-// Register ChartJS modules
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -26,16 +25,13 @@ ChartJS.register(
     Filler
 );
 
-const NEON = {
-    blue: "#3b82f6",
-    green: "#10b981",
-    emerald: "#059669",
-    orange: "#f59e0b",
-    red: "#ef4444",
-    rose: "#f43f5e",
+const COLORS = {
+    actual: "#38bdf8",
+    forecast: "#34d399",
+    band: "rgba(52, 211, 153, 0.12)",
+    bandStroke: "rgba(52, 211, 153, 0.22)",
     slate: "#94a3b8",
-    darkBorder: "rgba(115, 115, 115, 0.22)",
-    darkBg: "linear-gradient(145deg, rgba(8, 8, 8, 0.88), rgba(16, 16, 16, 0.74))"
+    grid: "rgba(255, 255, 255, 0.04)",
 };
 
 export default function ForecastChart({ historicalData = [], forecastData = [], stationName = "" }) {
@@ -47,78 +43,79 @@ export default function ForecastChart({ historicalData = [], forecastData = [], 
         );
     }
 
-    // 1. Process data chronologically
-    // Historical trends come in reverse (newest first). Let's sort chronological (oldest first).
     const histSorted = [...historicalData].reverse();
     const lastHistReading = histSorted[histSorted.length - 1];
 
-    // Combine labels (dates)
     const histLabels = histSorted.map(d => d.period || d.date);
     const forecastLabels = forecastData.map(d => d.date);
     const labels = [...histLabels, ...forecastLabels];
 
-    // Align datasets
     const histValues = histSorted.map(d => Number(d.avg_level || d.water_level));
-    
-    // Fill historical padding for forecast lines (null for historical, then forecast values)
     const padding = Array(histValues.length).fill(null);
-    
-    // Connect forecast with the last historical point if available
     const lastHistVal = lastHistReading ? Number(lastHistReading.avg_level || lastHistReading.water_level) : null;
-    
-    // Build forecast values arrays
+
     const predValues = [...padding.slice(0, -1), lastHistVal, ...forecastData.map(d => d.predicted)];
     const lowerValues = [...padding.slice(0, -1), lastHistVal, ...forecastData.map(d => d.lower_bound)];
     const upperValues = [...padding.slice(0, -1), lastHistVal, ...forecastData.map(d => d.upper_bound)];
-
-    // Pad actual values so they stop where predictions begin
     const actualValues = [...histValues, ...Array(forecastData.length).fill(null)];
 
     const data = {
         labels,
         datasets: [
             {
-                label: "Actual Water Level (m)",
+                label: "Actual",
                 data: actualValues,
-                borderColor: NEON.blue,
-                backgroundColor: "rgba(59, 130, 246, 0.08)",
+                borderColor: COLORS.actual,
+                backgroundColor: (ctx) => {
+                    const chart = ctx.chart;
+                    const { ctx: c, chartArea } = chart;
+                    if (!chartArea) return "rgba(56, 189, 248, 0.08)";
+                    const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    gradient.addColorStop(0, "rgba(56, 189, 248, 0.22)");
+                    gradient.addColorStop(1, "rgba(56, 189, 248, 0.01)");
+                    return gradient;
+                },
                 fill: true,
-                tension: 0.3,
-                pointRadius: 2,
-                pointHoverRadius: 5,
-                borderWidth: 3,
-            },
-            {
-                label: "AI Forecasted Level (m)",
-                data: predValues,
-                borderColor: NEON.green,
-                backgroundColor: "transparent",
-                borderDash: [6, 4],
-                fill: false,
                 tension: 0.35,
-                pointRadius: 1,
+                pointRadius: 0,
                 pointHoverRadius: 4,
                 borderWidth: 2.5,
+                order: 2,
+            },
+            {
+                label: "AI Forecast",
+                data: predValues,
+                borderColor: COLORS.forecast,
+                backgroundColor: "transparent",
+                borderDash: [7, 5],
+                fill: false,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2.4,
+                order: 1,
             },
             {
                 label: "Confidence Band (Upper)",
                 data: upperValues,
-                borderColor: "rgba(16, 185, 129, 0.15)",
+                borderColor: COLORS.bandStroke,
                 backgroundColor: "transparent",
                 fill: false,
                 pointRadius: 0,
                 tension: 0.35,
                 borderWidth: 1,
+                order: 3,
             },
             {
                 label: "Confidence Band (Lower)",
                 data: lowerValues,
-                borderColor: "rgba(16, 185, 129, 0.15)",
-                backgroundColor: "rgba(16, 185, 129, 0.06)",
-                fill: 2, // Fill to dataset index 2 (Confidence Band Upper)
+                borderColor: COLORS.bandStroke,
+                backgroundColor: COLORS.band,
+                fill: 2,
                 pointRadius: 0,
                 tension: 0.35,
                 borderWidth: 1,
+                order: 4,
             }
         ]
     };
@@ -126,62 +123,79 @@ export default function ForecastChart({ historicalData = [], forecastData = [], 
     const options = {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+            mode: "index",
+            intersect: false,
+        },
         plugins: {
             legend: {
-                position: 'top',
+                position: "top",
+                align: "end",
                 labels: {
-                    color: NEON.slate,
-                    font: { size: 11, weight: '600' },
+                    color: COLORS.slate,
+                    font: { size: 11, weight: "600" },
                     usePointStyle: true,
-                    padding: 15,
-                    filter: (legendItem) => {
-                        // Hide confidence bands from legend to keep it clean
-                        return !legendItem.text.includes("Confidence Band");
-                    }
+                    pointStyle: "circle",
+                    boxWidth: 8,
+                    padding: 16,
+                    filter: (legendItem) => !legendItem.text.includes("Confidence Band"),
                 },
             },
             tooltip: {
-                backgroundColor: "rgba(6, 6, 8, 0.96)",
-                titleColor: "#fff",
-                bodyColor: "#ccc",
-                titleFont: { size: 13, weight: 'bold' },
+                backgroundColor: "rgba(8, 8, 10, 0.96)",
+                titleColor: "#f8fafc",
+                bodyColor: "#cbd5e1",
+                titleFont: { size: 12, weight: "bold" },
                 padding: 12,
                 borderColor: "rgba(255,255,255,0.08)",
                 borderWidth: 1,
+                displayColors: true,
                 callbacks: {
                     label: function(context) {
                         const datasetLabel = context.dataset.label || "";
                         const index = context.dataIndex;
                         const val = context.raw;
-                        
-                        if (val === null) return null;
-                        
-                        if (datasetLabel.includes("AI Forecasted")) {
+
+                        if (val === null || val === undefined) return null;
+
+                        if (datasetLabel.includes("AI Forecast")) {
                             const low = lowerValues[index];
                             const high = upperValues[index];
                             return [
-                                `${datasetLabel}: ${val}m`,
-                                `95% Range: [${low}m - ${high}m]`
+                                `${datasetLabel}: ${Number(val).toFixed(2)} m`,
+                                `95% range: ${Number(low).toFixed(2)} – ${Number(high).toFixed(2)} m`
                             ];
                         }
-                        return `${datasetLabel}: ${val}m`;
+                        return `${datasetLabel}: ${Number(val).toFixed(2)} m`;
                     }
                 }
             }
         },
         scales: {
             x: {
-                grid: { color: "rgba(255,255,255,0.02)" },
-                ticks: { 
-                    color: NEON.slate,
-                    maxTicksLimit: 12,
-                    font: { size: 10 }
-                }
+                grid: { color: COLORS.grid, drawBorder: false },
+                ticks: {
+                    color: COLORS.slate,
+                    maxTicksLimit: 8,
+                    font: { size: 10 },
+                    maxRotation: 0,
+                },
+                border: { display: false },
             },
             y: {
-                grid: { color: "rgba(255,255,255,0.03)" },
-                ticks: { color: NEON.slate },
-                title: { display: true, text: "Depth to Water (meters)", color: NEON.slate, font: { size: 11 } }
+                grid: { color: COLORS.grid, drawBorder: false },
+                ticks: {
+                    color: COLORS.slate,
+                    font: { size: 10 },
+                    callback: (value) => `${value}m`,
+                },
+                border: { display: false },
+                title: {
+                    display: true,
+                    text: "Depth to water (m)",
+                    color: COLORS.slate,
+                    font: { size: 11, weight: "600" },
+                }
             }
         }
     };
@@ -189,10 +203,10 @@ export default function ForecastChart({ historicalData = [], forecastData = [], 
     return (
         <div className={styles.chartContainer}>
             <div className={styles.chartTitleRow}>
-                <span className={styles.stationLabel}>{stationName}</span>
+                <span className={styles.stationLabel}>{stationName || "Station forecast"}</span>
                 <span className={styles.aiBadge}>
                     <span className={styles.ping}></span>
-                    PROPHET ML FORECAST
+                    Live forecast
                 </span>
             </div>
             <div className={styles.canvasWrapper}>
