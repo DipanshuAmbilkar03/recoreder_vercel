@@ -37,14 +37,14 @@ ChartJS.register(ArcElement);
  * Neon Color Palette
  */
 const NEON = {
-    blue: "#3b82f6",
-    cyan: "#06b6d4",
-    green: "#10b981",
-    emerald: "#059669",
-    orange: "#f59e0b",
-    red: "#ef4444",
-    rose: "#f43f5e",
-    purple: "#8b5cf6",
+    blue: "#38bdf8",
+    cyan: "#22d3ee",
+    green: "#34d399",
+    emerald: "#10b981",
+    orange: "#fbbf24",
+    red: "#f87171",
+    rose: "#fb7185",
+    purple: "#a78bfa",
     slate: "#94a3b8",
 };
 
@@ -72,12 +72,12 @@ export function WaterLevelTrendChart({ trendData = [], stationName = "" }) {
                 label: "Avg Level (m)",
                 data: avgLevels,
                 borderColor: NEON.blue,
-                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                backgroundColor: "rgba(56, 189, 248, 0.12)",
                 fill: true,
-                tension: 0.4,
-                pointRadius: 2,
+                tension: 0.35,
+                pointRadius: 0,
                 pointHoverRadius: 4,
-                borderWidth: 3,
+                borderWidth: 2.5,
             },
             {
                 label: "Min Level (m)",
@@ -105,28 +105,45 @@ export function WaterLevelTrendChart({ trendData = [], stationName = "" }) {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
         plugins: {
             legend: {
-                position: 'top',
-                labels: { color: NEON.slate, font: { size: 12, weight: '600' }, usePointStyle: true, padding: 20 },
+                position: "top",
+                align: "end",
+                labels: {
+                    color: NEON.slate,
+                    font: { size: 11, weight: "600" },
+                    usePointStyle: true,
+                    pointStyle: "circle",
+                    boxWidth: 8,
+                    padding: 16,
+                },
             },
             tooltip: {
-                backgroundColor: "rgba(3, 5, 8, 0.95)",
-                titleFont: { size: 14, weight: 'bold' },
+                backgroundColor: "rgba(8, 8, 10, 0.96)",
+                titleColor: "#f8fafc",
+                bodyColor: "#cbd5e1",
+                titleFont: { size: 12, weight: "bold" },
                 padding: 12,
-                borderColor: "rgba(255,255,255,0.1)",
+                borderColor: "rgba(255,255,255,0.08)",
                 borderWidth: 1,
             }
         },
         scales: {
             x: {
-                grid: { color: "rgba(255,255,255,0.03)" },
-                ticks: { color: NEON.slate }
+                grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
+                ticks: { color: NEON.slate, maxTicksLimit: 8, font: { size: 10 }, maxRotation: 0 },
+                border: { display: false },
             },
             y: {
-                grid: { color: "rgba(255,255,255,0.03)" },
-                ticks: { color: NEON.slate },
-                title: { display: true, text: "meters", color: NEON.slate }
+                grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
+                ticks: {
+                    color: NEON.slate,
+                    font: { size: 10 },
+                    callback: (value) => `${value}m`,
+                },
+                border: { display: false },
+                title: { display: true, text: "Depth to water (m)", color: NEON.slate, font: { size: 11, weight: "600" } }
             }
         }
     };
@@ -155,11 +172,11 @@ function baseMiniLineOptions(yTitle = "Value") {
         },
         scales: {
             x: {
-                grid: { color: "rgba(255,255,255,0.03)" },
+                grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
                 ticks: { color: NEON.slate, maxRotation: 0, autoSkip: true }
             },
             y: {
-                grid: { color: "rgba(255,255,255,0.03)" },
+                grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
                 ticks: { color: NEON.slate },
                 title: { display: true, text: yTitle, color: NEON.slate }
             }
@@ -258,12 +275,12 @@ export function InfrastructureStatusLineChart({ statusData = [] }) {
                     },
                     scales: {
                         x: {
-                            grid: { color: "rgba(255,255,255,0.03)" },
+                            grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
                             ticks: { color: NEON.slate }
                         },
                         y: {
                             position: "left",
-                            grid: { color: "rgba(255,255,255,0.03)" },
+                            grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
                             ticks: { color: NEON.slate },
                             title: { display: true, text: "Node Count", color: NEON.slate }
                         },
@@ -552,3 +569,6 @@ export function SeasonalTrendChart({ seasonalData = [] }) {
         </div>
     );
 }
+
+
+

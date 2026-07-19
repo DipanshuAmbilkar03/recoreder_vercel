@@ -1,23 +1,35 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import L from "leaflet";
+import Link from "next/link";
 import styles from "./MapComponent.module.css";
+import {
+    formatDepthToWater,
+    resolveWellDepth,
+    stationWaterMetrics,
+} from "@/lib/waterLevel";
 
-const METER_RADIUS = 17;
+const METER_RADIUS = 13;
 const METER_CIRCUMFERENCE = 2 * Math.PI * METER_RADIUS;
+const DEFAULT_CENTER = [22.5937, 78.9629];
+const DEFAULT_ZOOM = 5;
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
 function formatTimestamp(station) {
-    const raw = station.latest_reading_timestamp || station.last_reading_time || station.updated_at || station.created_at;
+    const raw =
+        station.latest_reading_timestamp ||
+        station.last_reading_time ||
+        station.updated_at ||
+        station.created_at;
     if (!raw) return "N/A";
 
     const parsed = new Date(raw);
@@ -26,58 +38,69 @@ function formatTimestamp(station) {
 }
 
 function getStationPercentage(station) {
-    const waterLevel = Number(station.latest_water_level);
-    const wellDepth = Number(station.well_depth);
-
-    if (!Number.isFinite(waterLevel) || !Number.isFinite(wellDepth) || wellDepth <= 0) {
-        return 0;
-    }
-
-    const percentage = (Math.abs(waterLevel) / wellDepth) * 100;
-    return clamp(Math.round(percentage), 0, 100);
+    const metrics = stationWaterMetrics(station);
+    if (metrics.visualFillPercent == null) return 0;
+    return clamp(metrics.visualFillPercent, 0, 100);
 }
 
 function getMeterTier(percentage) {
-    if (percentage <= 33) {
-        return { name: "critical", color: "#ef4444", score: 3, label: "Low" };
+    if (percentage < 30) {
+        return { name: "critical", color: "#dc2626", score: 3, label: "Critical" };
     }
-
-    if (percentage <= 66) {
-        return { name: "warning", color: "#f59e0b", score: 2, label: "Medium" };
+    if (percentage < 55) {
+        return { name: "warning", color: "#d97706", score: 2, label: "Watch" };
     }
-
-    return { name: "safe", color: "#22c55e", score: 1, label: "High" };
+    return { name: "safe", color: "#16a34a", score: 1, label: "Stable" };
 }
+
+const iconCache = new Map();
 
 function createMeterIcon(station, isActive) {
     const percentage = getStationPercentage(station);
     const tier = getMeterTier(percentage);
-    const dashOffset = METER_CIRCUMFERENCE * (1 - percentage / 100);
+    const cacheKey = `${station.station_id || station.station_code}|${percentage}|${tier.name}|${isActive ? 1 : 0}`;
+    const cached = iconCache.get(cacheKey);
+    if (cached) return cached;
 
+    const dashOffset = METER_CIRCUMFERENCE * (1 - percentage / 100);
     const markerClasses = [
         styles.meterMarker,
         styles[tier.name],
         tier.name === "critical" ? styles.criticalPulse : "",
-        isActive ? styles.activeMarker : ""
-    ].filter(Boolean).join(" ");
+        isActive ? styles.activeMarker : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
 
     const html = `
         <div class="${markerClasses}" style="--meter-color:${tier.color};" role="img" aria-label="${station.station_name}: ${percentage}%">
-            <svg class="${styles.meterSvg}" viewBox="0 0 48 48" aria-hidden="true">
-                <circle class="${styles.meterTrack}" cx="24" cy="24" r="${METER_RADIUS}" />
-                <circle class="${styles.meterProgress}" cx="24" cy="24" r="${METER_RADIUS}" style="stroke-dasharray:${METER_CIRCUMFERENCE};stroke-dashoffset:${METER_CIRCUMFERENCE};--dash-offset:${dashOffset};" />
-            </svg>
-            <span class="${styles.meterValue}">${percentage}%</span>
+            <div class="${styles.meterCore}">
+                <svg class="${styles.meterSvg}" viewBox="0 0 48 48" aria-hidden="true">
+                    <circle class="${styles.meterTrack}" cx="24" cy="24" r="${METER_RADIUS}" />
+                    <circle class="${styles.meterProgress}" cx="24" cy="24" r="${METER_RADIUS}"
+                        style="stroke-dasharray:${METER_CIRCUMFERENCE};stroke-dashoffset:${dashOffset};" />
+                </svg>
+                <span class="${styles.meterValue}">${percentage}<small>%</small></span>
+            </div>
+            <span class="${styles.meterPin}"></span>
         </div>
     `;
 
-    return L.divIcon({
+    const icon = L.divIcon({
         html,
         className: styles.meterIconWrapper,
-        iconSize: [52, 52],
-        iconAnchor: [26, 26],
-        popupAnchor: [0, -22]
+        iconSize: [34, 40],
+        iconAnchor: [17, 38],
+        popupAnchor: [0, -34],
     });
+
+    // Keep cache bounded
+    if (iconCache.size > 500) {
+        const firstKey = iconCache.keys().next().value;
+        iconCache.delete(firstKey);
+    }
+    iconCache.set(cacheKey, icon);
+    return icon;
 }
 
 function createClusterIcon(cluster) {
@@ -88,68 +111,218 @@ function createClusterIcon(cluster) {
         return Math.max(highest, markerScore);
     }, 1);
 
-    const clusterTierClass = maxScore >= 3
-        ? styles.clusterCritical
-        : maxScore === 2
-            ? styles.clusterWarning
-            : styles.clusterSafe;
+    const clusterTierClass =
+        maxScore >= 3
+            ? styles.clusterCritical
+            : maxScore === 2
+              ? styles.clusterWarning
+              : styles.clusterSafe;
 
     return L.divIcon({
         html: `<div class="${styles.clusterIcon} ${clusterTierClass}"><span>${count}</span></div>`,
         className: styles.clusterIconContainer,
-        iconSize: [46, 46]
+        iconSize: [46, 46],
     });
 }
 
-// Custom hook/component to recenter map when bounds change
-function MapUpdater({ center, zoom }) {
+/** Move camera only when parent intentionally requests a focus target. */
+function FocusController({ focus }) {
     const map = useMap();
+    const lastFocusKey = useRef("");
+
     useEffect(() => {
-        map.setView(center, Math.max(map.getZoom(), zoom));
-    }, [center, zoom, map]);
+        if (!focus) return;
+        const key = `${focus.lat},${focus.lng},${focus.zoom}`;
+        if (lastFocusKey.current === key) return;
+        lastFocusKey.current = key;
+        map.setView([focus.lat, focus.lng], focus.zoom, { animate: true });
+    }, [focus, map]);
+
     return null;
 }
 
-export default function MapComponent({ stations = [], selectedStation, onStationSelect }) {
-    // Default center to central India
-    const [center, setCenter] = useState([22.5937, 78.9629]);
-    const [zoom, setZoom] = useState(5);
+const StationMarker = memo(function StationMarker({
+    station,
+    isActive,
+    onStationSelect,
+}) {
+    const percentage = getStationPercentage(station);
+    const tier = getMeterTier(percentage);
+    const wellDepth = resolveWellDepth(station.well_depth);
+    const icon = useMemo(
+        () => createMeterIcon(station, isActive),
+        // station fields that affect icon
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [
+            station.station_id,
+            station.latest_water_level,
+            station.well_depth,
+            isActive,
+        ]
+    );
 
-    // If we have stations, calculate rough bounds center
-    useEffect(() => {
-        if (stations.length > 0) {
-            const validStations = stations.filter(s => s.latitude && s.longitude);
-            if (validStations.length > 0) {
-                const latSum = validStations.reduce((sum, s) => sum + Number(s.latitude), 0);
-                const lngSum = validStations.reduce((sum, s) => sum + Number(s.longitude), 0);
-                setCenter([latSum / validStations.length, lngSum / validStations.length]);
-                setZoom(validStations.length === 1 ? 10 : 6);
-            }
-        }
-    }, [stations]);
+    return (
+        <Marker
+            position={[Number(station.latitude), Number(station.longitude)]}
+            icon={icon}
+            riseOnHover
+            zIndexOffset={isActive ? 1200 : 0}
+            dangerScore={tier.score}
+            eventHandlers={{
+                click: () => {
+                    if (onStationSelect) onStationSelect(station);
+                },
+            }}
+        >
+            <Tooltip
+                direction="top"
+                permanent={false}
+                offset={[0, -14]}
+                opacity={1}
+                className="quickTooltip"
+            >
+                <div className={styles.tooltipBody}>
+                    <strong>{station.station_name}</strong>
+                    <span>{`Fill ${percentage}% · ${tier.label}`}</span>
+                </div>
+            </Tooltip>
 
-    // Recenter map if a specific station is selected from the Right Panel
+            <Popup className={styles.customPopup}>
+                <div className={styles.popupContent}>
+                    <h3>{station.station_name}</h3>
+                    <p>
+                        <strong>Well fill:</strong> {percentage}% ({tier.label})
+                    </p>
+                    <p>
+                        <strong>Depth to water:</strong>{" "}
+                        {formatDepthToWater(station.latest_water_level)}
+                    </p>
+                    <p>
+                        <strong>Code:</strong> {station.station_code || "N/A"}
+                    </p>
+                    <p>
+                        <strong>Location:</strong> {station.district}, {station.state}
+                    </p>
+                    <p>
+                        <strong>Timestamp:</strong> {formatTimestamp(station)}
+                    </p>
+                    {wellDepth != null && (
+                        <p>
+                            <strong>Well depth:</strong> {wellDepth} m
+                        </p>
+                    )}
+                    {station.aquifer_type && (
+                        <p>
+                            <strong>Aquifer:</strong> {station.aquifer_type}
+                        </p>
+                    )}
+                    <span
+                        className={`${styles.statusBadge} ${
+                            styles[station.station_status?.toLowerCase()] || styles.active
+                        }`}
+                    >
+                        {station.station_status || "Active"}
+                    </span>
+                    <div className={styles.popupAction}>
+                        <Link href={`/dashboard?station_id=${station.station_id}`}>
+                            View Details
+                        </Link>
+                    </div>
+                </div>
+            </Popup>
+        </Marker>
+    );
+});
+
+export default function MapComponent({
+    stations = [],
+    selectedStation,
+    onStationSelect,
+}) {
+    const [focus, setFocus] = useState(null);
+    const didInitialFit = useRef(false);
+    const lastSelectedId = useRef(null);
+    const onSelectRef = useRef(onStationSelect);
+    onSelectRef.current = onStationSelect;
+
+    const validStations = useMemo(
+        () =>
+            stations.filter(
+                (s) =>
+                    Number.isFinite(Number(s.latitude)) &&
+                    Number.isFinite(Number(s.longitude))
+            ),
+        [stations]
+    );
+
+    // Initial fit once when first stations arrive — not on every filter/search change.
     useEffect(() => {
-        if (selectedStation && selectedStation.latitude && selectedStation.longitude) {
-            setCenter([Number(selectedStation.latitude), Number(selectedStation.longitude)]);
-            setZoom(12);
+        if (didInitialFit.current || validStations.length === 0) return;
+        didInitialFit.current = true;
+
+        if (validStations.length === 1) {
+            setFocus({
+                lat: Number(validStations[0].latitude),
+                lng: Number(validStations[0].longitude),
+                zoom: 10,
+            });
+            return;
         }
+
+        const latSum = validStations.reduce((sum, s) => sum + Number(s.latitude), 0);
+        const lngSum = validStations.reduce((sum, s) => sum + Number(s.longitude), 0);
+        setFocus({
+            lat: latSum / validStations.length,
+            lng: lngSum / validStations.length,
+            zoom: 6,
+        });
+    }, [validStations]);
+
+    // Fly only when selected station id changes (sidebar/marker click), not on list refresh.
+    useEffect(() => {
+        const id = selectedStation?.station_id ?? null;
+        if (id == null) return;
+        if (lastSelectedId.current === id) return;
+        if (
+            !Number.isFinite(Number(selectedStation.latitude)) ||
+            !Number.isFinite(Number(selectedStation.longitude))
+        ) {
+            return;
+        }
+        lastSelectedId.current = id;
+        setFocus({
+            lat: Number(selectedStation.latitude),
+            lng: Number(selectedStation.longitude),
+            zoom: 12,
+        });
     }, [selectedStation]);
+
+    const handleSelect = useMemo(
+        () => (station) => {
+            onSelectRef.current?.(station);
+        },
+        []
+    );
 
     return (
         <div className={styles.mapWrapper}>
             <MapContainer
-                center={center}
-                zoom={zoom}
-                scrollWheelZoom={true}
+                center={DEFAULT_CENTER}
+                zoom={DEFAULT_ZOOM}
+                scrollWheelZoom
                 className={styles.mapContainer}
+                // Prefer smoother local pan/zoom without remount thrash
+                preferCanvas={false}
             >
-                <MapUpdater center={center} zoom={zoom} />
+                <FocusController focus={focus} />
 
-                {/* Dark theme styled map tiles */}
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    // Browser HTTP cache helps when panning back over same area
+                    keepBuffer={2}
+                    updateWhenZooming={false}
+                    updateWhenIdle
                 />
 
                 <MarkerClusterGroup
@@ -158,55 +331,17 @@ export default function MapComponent({ stations = [], selectedStation, onStation
                     spiderfyOnMaxZoom
                     maxClusterRadius={46}
                     iconCreateFunction={createClusterIcon}
+                    // Avoid re-clustering work on tiny parent re-renders
+                    removeOutsideVisibleBounds
                 >
-                    {stations
-                        .filter((station) => Number.isFinite(Number(station.latitude)) && Number.isFinite(Number(station.longitude)))
-                        .map((station) => {
-                            const percentage = getStationPercentage(station);
-                            const tier = getMeterTier(percentage);
-                            const isActive = selectedStation?.station_id === station.station_id;
-
-                            return (
-                                <Marker
-                                    key={station.station_id || station.station_code}
-                                    position={[Number(station.latitude), Number(station.longitude)]}
-                                    icon={createMeterIcon(station, isActive)}
-                                    riseOnHover
-                                    zIndexOffset={isActive ? 1200 : 0}
-                                    dangerScore={tier.score}
-                                    eventHandlers={{
-                                        click: () => {
-                                            if (onStationSelect) onStationSelect(station);
-                                        }
-                                    }}
-                                >
-                                    <Tooltip direction="top" offset={[0, -18]} opacity={0.95} className="quickTooltip">
-                                        <div className={styles.tooltipBody}>
-                                            <strong>{station.station_name}</strong>
-                                            <span>{percentage}% • {tier.label}</span>
-                                        </div>
-                                    </Tooltip>
-
-                                    <Popup className={styles.customPopup}>
-                                        <div className={styles.popupContent}>
-                                            <h3>{station.station_name}</h3>
-                                            <p><strong>Value:</strong> {percentage}% ({tier.label})</p>
-                                            <p><strong>Code:</strong> {station.station_code || "N/A"}</p>
-                                            <p><strong>Location:</strong> {station.district}, {station.state}</p>
-                                            <p><strong>Timestamp:</strong> {formatTimestamp(station)}</p>
-                                            {station.well_depth && <p><strong>Depth:</strong> {station.well_depth}m</p>}
-                                            {station.aquifer_type && <p><strong>Aquifer:</strong> {station.aquifer_type}</p>}
-                                            <span className={`${styles.statusBadge} ${styles[station.station_status?.toLowerCase()] || styles.active}`}>
-                                                {station.station_status || "Active"}
-                                            </span>
-                                            <div className={styles.popupAction}>
-                                                <a href={`/stations/${station.station_id}`}>View Details</a>
-                                            </div>
-                                        </div>
-                                    </Popup>
-                                </Marker>
-                            );
-                        })}
+                    {validStations.map((station) => (
+                        <StationMarker
+                            key={station.station_id || station.station_code}
+                            station={station}
+                            isActive={selectedStation?.station_id === station.station_id}
+                            onStationSelect={handleSelect}
+                        />
+                    ))}
                 </MarkerClusterGroup>
             </MapContainer>
         </div>

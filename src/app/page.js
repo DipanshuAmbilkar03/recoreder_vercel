@@ -1,71 +1,189 @@
+﻿"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import styles from "./page.module.css";
+import { api } from "@/lib/api";
+
+const GlobeBackground = dynamic(() => import("@/components/GlobeBackground"), {
+    ssr: false,
+    loading: () => <div className={styles.globeFallback} aria-hidden="true" />,
+});
 
 export default function Home() {
+    const [stats, setStats] = useState(null);
+    const [apiOnline, setApiOnline] = useState(null);
+    const [clock, setClock] = useState(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        setClock(new Date());
+        const t = setInterval(() => setClock(new Date()), 1000);
+        return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const [health, overview] = await Promise.all([
+                    api.get("/health", { timeout: 5000 }),
+                    api.get("/analytics/overview", { timeout: 8000 }),
+                ]);
+                if (cancelled) return;
+                setApiOnline(health.data?.status === "ok");
+                setStats(overview.data || null);
+            } catch {
+                if (!cancelled) {
+                    setApiOnline(false);
+                    setStats(null);
+                }
+            }
+        };
+        load();
+        const poll = setInterval(load, 45000);
+        return () => {
+            cancelled = true;
+            clearInterval(poll);
+        };
+    }, []);
+
+    const formatNum = (v) => {
+        if (v == null || v === "") return "—";
+        const n = Number(v);
+        return Number.isFinite(n) ? n.toLocaleString("en-IN") : String(v);
+    };
+
+    const timeLabel = useMemo(() => {
+        if (!clock) return "--:--:--";
+        return clock.toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
+    }, [clock]);
+
+    const dateLabel = useMemo(() => {
+        if (!clock) return "—";
+        return clock.toLocaleDateString("en-IN", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+        });
+    }, [clock]);
+
+    const statusText =
+        apiOnline === true ? "System online" : apiOnline === false ? "API offline" : "Connecting...";
+
     return (
-        <main className={styles.dynamicShell}>
-            <section className={styles.dynamicHero}>
-                <video
-                    className={styles.heroVideo}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="metadata"
-                    poster="/waterFalling.jpg"
-                    aria-hidden="true"
+        <section className={`${styles.hero} ${mounted ? styles.ready : ""}`}>
+            <GlobeBackground />
+
+            {/* Slim status strip under nav */}
+            <div className={styles.statusStrip}>
+                <span
+                    className={`${styles.statusDot} ${
+                        apiOnline === true
+                            ? styles.online
+                            : apiOnline === false
+                              ? styles.offline
+                              : styles.checking
+                    }`}
                 >
-                    <source src="/video/71122-537102350.mp4" type="video/mp4" />
-                </video>
-                <div className={styles.videoOverlay} aria-hidden="true" />
+                    {statusText}
+                </span>
+                <span className={styles.clock} suppressHydrationWarning>
+                    {mounted ? dateLabel : "—"}
+                    <em suppressHydrationWarning>{mounted ? timeLabel : "--:--:--"}</em>
+                </span>
+            </div>
 
-                <div className={styles.heroContent}>
-                    <span className={styles.heroBadge}>National Groundwater Command Center</span>
-                    <h1>DWLR Groundwater Monitoring</h1>
-                    <p>
-                        A unified control surface for station health, regional groundwater behavior, and early-warning
-                        trend signals.
-                    </p>
+            {/* Centered content group */}
+            <div className={styles.heroInner}>
+                <div className={styles.contentGrid}>
+                    <div className={styles.copyCol}>
+                        <p className={`${styles.kicker} ${styles.anim} ${styles.d1}`}>
+                            Jal Shakti · India focus
+                        </p>
+                        <h1 className={`${styles.title} ${styles.anim} ${styles.d2}`}>
+                            Track groundwater
+                            <span>across India</span>
+                        </h1>
+                        <p className={`${styles.lead} ${styles.anim} ${styles.d3}`}>
+                            Live DWLR station map, depth trends, and AI forecast — built for faster
+                            field and district decisions.
+                        </p>
 
-                    <div className={styles.heroActions}>
-                        <Link href="/dashboard" className={styles.primaryAction}>Go to Dashboard</Link>
-                        <Link href="/map" className={styles.secondaryAction}>Open Map</Link>
+                        <div className={`${styles.actions} ${styles.anim} ${styles.d4}`}>
+                            <Link href="/map" className={styles.primary}>
+                                <span>Explore Map</span>
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path
+                                        d="M5 12h14M13 6l6 6-6 6"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </svg>
+                            </Link>
+                            <Link href="/dashboard" className={styles.secondary}>
+                                View Graphs
+                            </Link>
+                            <Link href="/analytics" className={styles.ghost}>
+                                District Risk
+                            </Link>
+                        </div>
+
+                        <div className={`${styles.pathRow} ${styles.anim} ${styles.d5}`}>
+                            <Link href="/map">Map</Link>
+                            <i />
+                            <Link href="/dashboard">Dashboard</Link>
+                            <i />
+                            <Link href="/analytics">Analytics</Link>
+                            <i />
+                            <Link href="/stations">Stations</Link>
+                        </div>
                     </div>
 
-                    <div className={styles.heroStats}>
-                        <article>
-                            <strong>Live Monitoring</strong>
-                            <span>Real-time station visibility</span>
-                        </article>
-                        <article>
-                            <strong>Smart Alerts</strong>
-                            <span>Priority based low-medium-high</span>
-                        </article>
-                        <article>
-                            <strong>Regional Insights</strong>
-                            <span>District and seasonal intelligence</span>
-                        </article>
-                    </div>
+                    <aside className={`${styles.statsCard} ${styles.anim} ${styles.d4}`}>
+                        <div className={styles.statsHead}>
+                            <span>Live network</span>
+                            <strong>{apiOnline ? "Synced" : "Waiting"}</strong>
+                        </div>
+                        <ul className={styles.statsList}>
+                            <li>
+                                <span>Stations</span>
+                                <strong>{stats ? formatNum(stats.total_stations) : "..."}</strong>
+                            </li>
+                            <li>
+                                <span>Active</span>
+                                <strong>{stats ? formatNum(stats.active_stations) : "..."}</strong>
+                            </li>
+                            <li>
+                                <span>Avg depth</span>
+                                <strong>
+                                    {stats?.avg_water_level != null
+                                        ? `${Number(stats.avg_water_level).toFixed(1)} m`
+                                        : "..."}
+                                </strong>
+                            </li>
+                            <li>
+                                <span>Open alerts</span>
+                                <strong className={styles.alertVal}>
+                                    {stats ? formatNum(stats.open_alerts ?? 0) : "..."}
+                                </strong>
+                            </li>
+                        </ul>
+                        <Link href="/stations" className={styles.statsCta}>
+                            Browse full station list
+                        </Link>
+                    </aside>
                 </div>
-
-                <footer className={styles.heroFooter}>
-                    <span className={styles.creatorText}>Created by Dipanshu • Data from WRAIS</span>
-                    <a
-                        href="https://github.com/dipanshuAmbilkar03"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.footerGithub}
-                    >
-                        <svg className={styles.githubIcon} viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                                d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.25.82-.57v-2.2c-3.34.73-4.04-1.6-4.04-1.6a3.16 3.16 0 0 0-1.33-1.75c-1.09-.74.09-.73.09-.73a2.5 2.5 0 0 1 1.83 1.23 2.53 2.53 0 0 0 3.45.99 2.53 2.53 0 0 1 .75-1.59c-2.67-.3-5.47-1.34-5.47-5.94a4.66 4.66 0 0 1 1.24-3.24 4.33 4.33 0 0 1 .12-3.19s1.01-.32 3.3 1.24a11.45 11.45 0 0 1 6 0c2.28-1.56 3.3-1.24 3.3-1.24a4.33 4.33 0 0 1 .12 3.19 4.66 4.66 0 0 1 1.24 3.24c0 4.61-2.8 5.64-5.48 5.94a2.84 2.84 0 0 1 .81 2.2v3.26c0 .32.22.69.83.57A12 12 0 0 0 12 .5Z"
-                                fill="currentColor"
-                            />
-                        </svg>
-                        GitHub
-                    </a>
-                </footer>
-            </section>
-        </main>
+            </div>
+        </section>
     );
 }

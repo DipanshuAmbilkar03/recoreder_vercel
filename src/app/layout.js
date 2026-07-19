@@ -1,4 +1,4 @@
-import "./globals.css";
+﻿import "./globals.css";
 import Navbar from "@/components/Navbar/Navbar";
 
 export const metadata = {
@@ -16,13 +16,22 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
     return (
-        <html lang="en">
+        // suppressHydrationWarning: browser extensions (Bitdefender etc.) inject attributes
+        // like bis_skin_checked / bis_register into HTML before React hydrates.
+        <html lang="en" suppressHydrationWarning>
             <head>
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Datatype:wght@100..900&family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet" />
+                <link
+                    rel="preconnect"
+                    href="https://fonts.gstatic.com"
+                    crossOrigin="anonymous"
+                />
+                <link
+                    href="https://fonts.googleapis.com/css2?family=Datatype:wght@100..900&family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap"
+                    rel="stylesheet"
+                />
             </head>
-            <body>
+            <body suppressHydrationWarning>
                 <Navbar />
                 {children}
             </body>

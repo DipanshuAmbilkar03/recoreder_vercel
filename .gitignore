@@ -85,3 +85,5 @@ src/demo assets/
 # video exports (too large for normal git)
 /public/video/*.mp4
 !/public/video/71122-537102350.mp4
+
+dipanshu/

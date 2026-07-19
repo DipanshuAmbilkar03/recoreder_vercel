@@ -1,5 +1,12 @@
 import React from 'react';
 import styles from './StationInsightPanel.module.css';
+import {
+    depthToWater,
+    getWaterStatus,
+    resolveWellDepth,
+    visualWellDepth,
+    wellFillPercent,
+} from '@/lib/waterLevel';
 
 function InsightIcon({ type }) {
     if (type === 'station') {
@@ -47,34 +54,25 @@ function InsightIcon({ type }) {
  * @param {number} waterLevel - Current water level in meters below ground
  */
 export function StationInsightPanel({ stationData, wellDepth, waterLevel }) {
-    
-    // Safety checks / defaults
-    const depth = wellDepth || 100; // default 100m if unknown
-    
-    // Ensure waterLevel is a valid number, otherwise default to full depth
-    const level = (typeof waterLevel === 'number' && !isNaN(waterLevel)) ? Math.abs(waterLevel) : depth;
-    
-    // Calculate percentage (0% = empty/at bottom, 100% = full/at surface)
-    // If level is 10, and depth is 100. Water is 10m below surface.
-    // That means water fills 90m of the 100m shaft. (90%)
-    let fillPercentage = 0;
-    if (level <= depth) {
-        fillPercentage = ((depth - level) / depth) * 100;
-    }
+    const knownDepth = resolveWellDepth(wellDepth);
+    const level = depthToWater(waterLevel);
+    const depth = visualWellDepth(waterLevel, wellDepth);
+    const fillRaw = wellFillPercent(waterLevel, wellDepth, { allowVisualFallback: true });
+    const fillPercentage = fillRaw == null ? 0 : fillRaw;
+    const status = getWaterStatus(waterLevel, wellDepth);
 
-    // Determine status color based on depth percentage
-    // e.g. if water is in bottom 20% -> critical (red)
-    // if water is in middle 50% -> moderate (orange)
-    // if water is in top 30% -> safe (green)
     let statusClass = styles.statusSafe;
-    let statusText = "Safe / Optimal";
-    if (fillPercentage < 20) {
-        statusClass = styles.statusCritical;
-        statusText = "Critical Low";
-    } else if (fillPercentage < 50) {
-        statusClass = styles.statusModerate;
-        statusText = "Moderate";
-    }
+    if (status.key === "critical") statusClass = styles.statusCritical;
+    else if (status.key === "warning") statusClass = styles.statusModerate;
+
+    const statusText =
+        status.key === "critical"
+            ? "Critical Low"
+            : status.key === "warning"
+              ? "Moderate / Watch"
+              : status.key === "unknown"
+                ? "No data"
+                : "Stable / Optimal";
 
     return (
         <div className={styles.container}>
@@ -84,6 +82,47 @@ export function StationInsightPanel({ stationData, wellDepth, waterLevel }) {
                 <div className={styles.surfaceLine}></div>
                 
                 <div className={styles.wellEnvironment}>
+                    {/* Depth Measurement Bracket (Surface to Water Level) */}
+                    {fillPercentage < 100 && (
+                        <div 
+                            className={styles.depthBracket}
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                height: `${100 - fillPercentage}%`,
+                                left: 'calc(50% + 55px)', // Positioned to the right of the 80px shaft
+                                width: '8px',
+                                borderRight: '2px solid #38bdf8',
+                                borderTop: '2px solid #38bdf8',
+                                borderBottom: '2px solid #38bdf8',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                transition: 'height 1.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                zIndex: 10
+                            }}
+                        >
+                            <span 
+                                style={{
+                                    color: '#38bdf8',
+                                    fontSize: '0.68rem',
+                                    fontWeight: '800',
+                                    whiteSpace: 'nowrap',
+                                    transform: 'translateX(12px)', // Push text to the right of the bracket line
+                                    background: 'rgba(15, 23, 42, 0.9)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                                    alignSelf: 'flex-start',
+                                    boxShadow: '0 4px 10px rgba(0, 0, 0, 0.4)',
+                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)'
+                                }}
+                            >
+                                {level != null ? `${level.toFixed(2)}m Depth` : "No data"}
+                            </span>
+                        </div>
+                    )}
+
                     <div className={styles.wellShaft}>
                         
                         {/* The Animated Water Fill */}
@@ -105,7 +144,9 @@ export function StationInsightPanel({ stationData, wellDepth, waterLevel }) {
                             className={styles.currentLevelIndicator}
                             style={{ bottom: `${fillPercentage}%` }}
                         >
-                            <span className={styles.currentLevelTag}>-{level.toFixed(2)}m</span>
+                            <span className={styles.currentLevelTag}>
+                                {level != null ? `-${level.toFixed(2)}m` : "N/A"}
+                            </span>
                         </div>
 
                     </div>
@@ -144,7 +185,11 @@ export function StationInsightPanel({ stationData, wellDepth, waterLevel }) {
                         <div className={styles.iconWrapper}><InsightIcon type="depth" /></div>
                         <div className={styles.itemContent}>
                             <label>Well Depth</label>
-                            <strong>{depth} meters</strong>
+                            <strong>
+                                {knownDepth != null
+                                    ? `${knownDepth} meters`
+                                    : `${depth} m (est.)`}
+                            </strong>
                         </div>
                     </div>
                 </div>
@@ -153,9 +198,7 @@ export function StationInsightPanel({ stationData, wellDepth, waterLevel }) {
                     <div className={styles.highlightItem}>
                         <label>Current Water Level</label>
                         <div className={styles.mainValue}>
-                            {(typeof waterLevel === 'number' && !isNaN(waterLevel)) 
-                                ? `-${Math.abs(waterLevel).toFixed(2)}m` 
-                                : 'N/A'}
+                            {level != null ? `${level.toFixed(2)} m bgl` : "N/A"}
                         </div>
                         <div className={styles.trendSubtitle}>meters below ground level</div>
                     </div>
@@ -165,6 +208,11 @@ export function StationInsightPanel({ stationData, wellDepth, waterLevel }) {
                         <div className={`${styles.statusBadge} ${statusClass}`}>
                             {statusText}
                         </div>
+                        {status.fillPercent != null && (
+                            <div className={styles.trendSubtitle}>
+                                Well fill {status.fillPercent}%
+                            </div>
+                        )}
                     </div>
                 </div>
 

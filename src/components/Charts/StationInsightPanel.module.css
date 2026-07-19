@@ -1,12 +1,12 @@
-.container {
+﻿.container {
     display: grid;
     grid-template-columns: 1fr 1.5fr;
     gap: 30px;
     position: relative;
     overflow: hidden;
     isolation: isolate;
-    background: linear-gradient(160deg, rgba(8, 8, 8, 0.95), rgba(18, 18, 18, 0.82));
-    border: 1px solid rgba(115, 115, 115, 0.25);
+    background: linear-gradient(160deg, rgba(12, 12, 14, 0.98), rgba(8, 8, 10, 0.94));
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-xl);
     padding: 24px;
     height: 100%;
@@ -330,3 +330,4 @@
     color: #f87171;
     border: 1px solid rgba(239, 68, 68, 0.4);
 }
+
