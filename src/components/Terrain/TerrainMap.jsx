@@ -83,7 +83,7 @@ export default function TerrainMap({ stations = [], selectedId, onSelect }) {
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Street">
                         <TileLayer
-                            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                            url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${process.env.NEXT_PUBLIC_CARTO_KEY}`}
                             attribution="&copy; OSM &copy; CARTO"
                         />
                     </LayersControl.BaseLayer>
